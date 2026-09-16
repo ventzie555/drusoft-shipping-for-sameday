@@ -3,14 +3,14 @@ jQuery(document).ready(function($) {
     var params = drushfs_metabox_params;
 
     function showMetaboxNotice(message, type) {
-        var $notice = $('#speedy-metabox-notice');
+        var $notice = $('#sameday-metabox-notice');
         var color = (type === 'error') ? '#a00' : '#00a32a';
         $notice.html('<p style="color: ' + color + ';">' + message + '</p>');
         setTimeout(function() { $notice.fadeOut(400, function() { $(this).html('').show(); }); }, 5000);
     }
 
-    // Generate Waybill
-    $(document).on('click', '.speedy-order-generate', function(e) {
+    // Create the waybill.
+    $(document).on('click', '.sameday-order-generate', function(e) {
         e.preventDefault();
         var button = $(this);
         var orderId = button.data('order-id');
@@ -27,49 +27,26 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    // Reload to show the waybill info
+                    // Reload so the waybill number, label and cancel button appear.
                     location.reload();
                 } else {
                     showMetaboxNotice(response.data, 'error');
-                    button.text('Generate Waybill').prop('disabled', false);
+                    button.text(params.i18n.generate).prop('disabled', false);
                 }
-            }
-        });
-    });
-
-    // Request Courier
-    $(document).on('click', '.speedy-order-request-courier', function(e) {
-        e.preventDefault();
-        var button = $(this);
-        var orderId = button.data('order-id');
-
-        button.text(params.i18n.requesting).prop('disabled', true);
-
-        $.ajax({
-            url: params.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'drushfs_request_courier',
-                order_id: orderId,
-                nonce: params.nonce
             },
-            success: function(response) {
-                if (response.success) {
-                    button.replaceWith(
-                        '<span class="button disabled" style="text-align:center; color: green;">' +
-                        params.i18n.courier_requested + '</span>'
-                    );
-                    showMetaboxNotice(response.data, 'success');
-                } else {
-                    showMetaboxNotice(response.data, 'error');
-                    button.text('Request Courier').prop('disabled', false);
-                }
+            error: function() {
+                showMetaboxNotice(params.i18n.request_failed, 'error');
+                button.text(params.i18n.generate).prop('disabled', false);
             }
         });
     });
 
-    // Cancel Shipment
-    $(document).on('click', '.speedy-order-cancel', function(e) {
+    // Cancel the waybill.
+    //
+    // There is no "request a courier" button here, unlike the Speedy plugin
+    // this was forked from: Sameday's client API has no courier-request
+    // endpoint, so such a button could never do anything.
+    $(document).on('click', '.sameday-order-cancel', function(e) {
         e.preventDefault();
         if (!confirm(params.i18n.confirm_cancel)) {
             return;
@@ -77,7 +54,7 @@ jQuery(document).ready(function($) {
 
         var button = $(this);
         var orderId = button.data('order-id');
-        var $content = $('#speedy-metabox-content');
+        var $content = $('#sameday-metabox-content');
 
         button.text(params.i18n.cancelling).prop('disabled', true);
 
@@ -91,19 +68,21 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    // Replace metabox content with Generate button
                     $content.html(
-                        '<p>No waybill generated yet.</p>' +
-                        '<button type="button" class="button button-primary speedy-order-generate" data-order-id="' + orderId + '">' +
-                        'Generate Waybill</button>'
+                        '<p>' + params.i18n.no_waybill + '</p>' +
+                        '<button type="button" class="button button-primary sameday-order-generate" data-order-id="' + orderId + '">' +
+                        params.i18n.generate + '</button>'
                     );
                     showMetaboxNotice(response.data, 'success');
                 } else {
                     showMetaboxNotice(response.data, 'error');
-                    button.text('Cancel Shipment').prop('disabled', false);
+                    button.text(params.i18n.cancel).prop('disabled', false);
                 }
+            },
+            error: function() {
+                showMetaboxNotice(params.i18n.request_failed, 'error');
+                button.text(params.i18n.cancel).prop('disabled', false);
             }
         });
     });
 });
-

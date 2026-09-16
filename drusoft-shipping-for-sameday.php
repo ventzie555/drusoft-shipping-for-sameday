@@ -115,7 +115,7 @@ function drushfs_activate(): void {
  */
 function drushfs_has_credentials(): bool {
 	$settings = get_option( 'woocommerce_drushfs_sameday_settings' );
-	if ( ! empty( $settings['speedy_username'] ) && ! empty( $settings['speedy_password'] ) ) {
+	if ( ! empty( $settings['sameday_username'] ) && ! empty( $settings['sameday_password'] ) ) {
 		return true;
 	}
 	global $wpdb;
@@ -128,7 +128,7 @@ function drushfs_has_credentials(): bool {
 	);
 	foreach ( (array) $rows as $row ) {
 		$inst = maybe_unserialize( $row->option_value );
-		if ( is_array( $inst ) && ! empty( $inst['speedy_username'] ) && ! empty( $inst['speedy_password'] ) ) {
+		if ( is_array( $inst ) && ! empty( $inst['sameday_username'] ) && ! empty( $inst['sameday_password'] ) ) {
 			return true;
 		}
 	}
@@ -528,30 +528,10 @@ function drushfs_enqueue_scripts(): void {
 	);
 
 	if ( is_checkout() ) {
-		// Own office/automat map (Leaflet, bundled locally — never a CDN). Replaces
-		// the Speedy-hosted office_locator iframe, whose office popup renders wider
-		// than a phone-sized frame and clips its select button out of reach.
-		wp_enqueue_script(
-			'drushfs-map',
-			DRUSHFS_URL . 'assets/js/map.js',
-			array( 'jquery', 'drushfs-common' ),
-			DRUSHFS_VER,
-			true
-		);
-		wp_localize_script(
-			'drushfs-map',
-			'drushfs_map_cfg',
-			array(
-				'leaflet_css'    => DRUSHFS_URL . 'assets/vendor/leaflet/leaflet.css',
-				'leaflet_js'     => DRUSHFS_URL . 'assets/vendor/leaflet/leaflet.js',
-				'leaflet_images' => DRUSHFS_URL . 'assets/vendor/leaflet/images/',
-			)
-		);
-
 		wp_enqueue_script(
 			'drushfs-checkout',
 			DRUSHFS_URL . 'assets/js/checkout.js',
-			array( 'jquery', 'select2', 'drushfs-common', 'drushfs-map' ),
+			array( 'jquery', 'select2', 'drushfs-common' ),
 			DRUSHFS_VER,
 			true
 		);
@@ -973,59 +953,6 @@ function drushfs_search_offices(): void {
 /**
  * AJAX Handler for file uploads in admin settings.
  */
-add_action( 'wp_ajax_drushfs_upload_file', 'drushfs_upload_file' );
-function drushfs_upload_file(): void {
-	check_ajax_referer( 'drushfs_admin', 'nonce' );
-
-	// Check permissions
-	if ( ! current_user_can( 'manage_woocommerce' ) ) {
-		wp_send_json_error( __( 'Permission denied.', 'drusoft-shipping-for-sameday' ) );
-	}
-
-	// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- $_FILES is validated by wp_handle_upload / wp_check_filetype.
-	if ( ! isset( $_FILES['file'] ) || empty( $_FILES['file']['name'] ) ) {
-		wp_send_json_error( __( 'No file uploaded.', 'drusoft-shipping-for-sameday' ) );
-	}
-
-	// Validate file type (CSV only)
-	$file_type = wp_check_filetype( sanitize_file_name( wp_unslash( $_FILES['file']['name'] ) ) );
-	if ( 'csv' !== $file_type['ext'] ) {
-		wp_send_json_error( __( 'Invalid file type. Please upload a CSV file.', 'drusoft-shipping-for-sameday' ) );
-	}
-
-	if ( ! function_exists( 'wp_handle_upload' ) ) {
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-	}
-
-	// Redirect uploads to a dedicated directory.
-	$upload_filter = static function ( $uploads ) {
-		$uploads['subdir'] = '/speedy_shipping';
-		$uploads['path']   = $uploads['basedir'] . '/speedy_shipping';
-		$uploads['url']    = $uploads['baseurl'] . '/speedy_shipping';
-		return $uploads;
-	};
-	add_filter( 'upload_dir', $upload_filter );
-
-	$overrides = [
-		'test_form' => false,
-		'mimes'     => [ 'csv' => 'text/csv' ],
-	];
-
-	$uploaded = wp_handle_upload( $_FILES['file'], $overrides ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-
-	remove_filter( 'upload_dir', $upload_filter );
-
-	if ( isset( $uploaded['error'] ) ) {
-		wp_send_json_error( $uploaded['error'] );
-	}
-
-	update_option( 'drushfs_fileceni_path', $uploaded['file'] );
-
-	wp_send_json_success( [
-		'path' => $uploaded['file'],
-		'name' => basename( $uploaded['file'] ),
-	] );
-}
 
 /**
  * Helper: Retrieve the first available Speedy API credentials from settings.
@@ -1047,10 +974,10 @@ function drushfs_get_first_credentials(): ?array {
 	if ( $rows ) {
 		foreach ( $rows as $row ) {
 			$settings = maybe_unserialize( $row->option_value );
-			if ( is_array( $settings ) && ! empty( $settings['speedy_username'] ) && ! empty( $settings['speedy_password'] ) ) {
+			if ( is_array( $settings ) && ! empty( $settings['sameday_username'] ) && ! empty( $settings['sameday_password'] ) ) {
 				return [
-					'username' => $settings['speedy_username'],
-					'password' => $settings['speedy_password'],
+					'username' => $settings['sameday_username'],
+					'password' => $settings['sameday_password'],
 				];
 			}
 		}
@@ -1342,58 +1269,6 @@ function drushfs_get_cities_ajax(): void {
  * AJAX Handler: Check availability of offices/automats in a city.
  * Used by checkout.js
  */
-add_action( 'wp_ajax_drushfs_check_availability', 'drushfs_check_availability_ajax' );
-add_action( 'wp_ajax_nopriv_drushfs_check_availability', 'drushfs_check_availability_ajax' );
-
-function drushfs_check_availability_ajax(): void {
-	check_ajax_referer( 'drushfs_public', 'nonce' );
-
-	$city_id = isset( $_POST['city_id'] ) ? absint( $_POST['city_id'] ) : 0;
-
-	if ( ! $city_id ) {
-		wp_send_json_error( __( 'Missing city ID', 'drusoft-shipping-for-sameday' ) );
-	}
-
-	global $wpdb;
-
-	// Dropdown payload only — id + label, nothing else. This response is fetched
-	// the moment a city is chosen, i.e. mid-checkout on a phone, so its size is
-	// felt directly: carrying the map's name/address/lat/lng for every office
-	// (added 14.08 with the own-map picker) grew Sofia's 320 offices from ~48 KB
-	// to 226 KB, several seconds of dead screen on mobile data at exactly the
-	// step where a customer is deciding whether we are worth the trouble. Map
-	// coordinates now load on demand, see drushfs_map_points_ajax().
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-	$results = $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT id, name, address, office_type FROM {$wpdb->prefix}drushfs_offices WHERE city_id = %d ORDER BY name ASC",
-			$city_id
-		)
-	);
-
-	$offices = [];
-	$automats = [];
-
-	foreach ( $results as $row ) {
-		$item = [
-			'id'    => $row->id,
-			'label' => sprintf( '%s %s - %s', $row->id, $row->name, $row->address ),
-		];
-
-		if ( drushfs_is_automat( $row->office_type, $row->name ) ) {
-			$automats[] = $item;
-		} else {
-			$offices[] = $item;
-		}
-	}
-
-	wp_send_json_success( [
-		'has_office'  => ! empty( $offices ),
-		'has_automat' => ! empty( $automats ),
-		'offices'     => $offices,
-		'automats'    => $automats
-	] );
-}
 
 /**
  * AJAX Handler: Get region code by city ID.
@@ -1403,95 +1278,7 @@ function drushfs_check_availability_ajax(): void {
  * Map points for one city — the heavy half of the old availability payload,
  * fetched only when the customer actually opens the map picker.
  */
-add_action( 'wp_ajax_drushfs_map_points', 'drushfs_map_points_ajax' );
-add_action( 'wp_ajax_nopriv_drushfs_map_points', 'drushfs_map_points_ajax' );
 
-function drushfs_map_points_ajax(): void {
-	check_ajax_referer( 'drushfs_public', 'nonce' );
-
-	$city_id = isset( $_POST['city_id'] ) ? absint( $_POST['city_id'] ) : 0;
-	if ( ! $city_id ) {
-		wp_send_json_error( __( 'Missing city ID', 'drusoft-shipping-for-sameday' ) );
-	}
-
-	global $wpdb;
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-	$rows = $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT id, name, address, office_type, latitude, longitude FROM {$wpdb->prefix}drushfs_offices WHERE city_id = %d ORDER BY name ASC",
-			$city_id
-		)
-	);
-
-	$points = [];
-	foreach ( $rows as $row ) {
-		$points[] = [
-			'id'          => $row->id,
-			'name'        => $row->name,
-			'address'     => $row->address,
-			// The office syncer stores Speedy's location.x/location.y straight
-			// into latitude/longitude — but x IS the longitude and y the
-			// latitude, so the columns hold each other's values (Haskovo sits
-			// in the DB as lat 25.55, which is Saudi Arabia). Swap on read;
-			// fixing the syncer requires a table migration for every install,
-			// which belongs in its own release.
-			'lat'         => (float) $row->longitude,
-			'lng'         => (float) $row->latitude,
-			'office_type' => drushfs_is_automat( $row->office_type, $row->name ) ? 'APS' : 'OFFICE',
-		];
-	}
-	wp_send_json_success( $points );
-}
-
-add_action( 'wp_ajax_drushfs_get_region_by_city', 'drushfs_get_region_by_city_ajax' );
-add_action( 'wp_ajax_nopriv_drushfs_get_region_by_city', 'drushfs_get_region_by_city_ajax' );
-
-function drushfs_get_region_by_city_ajax(): void {
-	check_ajax_referer( 'drushfs_public', 'nonce' );
-
-	$city_id = isset( $_POST['city_id'] ) ? absint( $_POST['city_id'] ) : 0;
-
-	if ( ! $city_id ) {
-		wp_send_json_error( __( 'Missing city ID', 'drusoft-shipping-for-sameday' ) );
-	}
-
-	global $wpdb;
-
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-	$region_name = $wpdb->get_var(
-		$wpdb->prepare(
-			"SELECT region FROM {$wpdb->prefix}drushfs_cities WHERE id = %d",
-			$city_id
-		)
-	);
-
-	if ( ! $region_name ) {
-		wp_send_json_error( __( 'City not found', 'drusoft-shipping-for-sameday' ) );
-	}
-
-	// Use helper function and flip it for reverse mapping
-	$region_map = drushfs_get_region_map();
-	$reverse_map = array_flip( $region_map );
-
-	// Handle fuzzy matching if exact match fails (e.g. "Област София" vs "София")
-	$region_code = $reverse_map[ $region_name ] ?? '';
-
-	if ( ! $region_code ) {
-		// Try to find partial match
-		foreach ( $reverse_map as $name => $code ) {
-			if ( mb_stripos( $region_name, $name ) !== false ) {
-				$region_code = $code;
-				break;
-			}
-		}
-	}
-
-	if ( $region_code ) {
-		wp_send_json_success( [ 'region' => $region_code ] );
-	} else {
-		wp_send_json_error( __( 'Region mapping not found for: ', 'drusoft-shipping-for-sameday' ) . esc_html( $region_name ) );
-	}
-}
 
 /**
  * Validate Checkout Fields
@@ -1504,84 +1291,6 @@ add_action( 'woocommerce_checkout_process', 'drushfs_validate_checkout' );
  * Calls the Speedy /v1/location/street endpoint.
  * Strips common Bulgarian street prefixes (ул., улица, бул., булевард, etc.)
  */
-add_action( 'wp_ajax_drushfs_search_streets', 'drushfs_search_streets_ajax' );
-add_action( 'wp_ajax_nopriv_drushfs_search_streets', 'drushfs_search_streets_ajax' );
-
-function drushfs_search_streets_ajax(): void {
-	check_ajax_referer( 'drushfs_public', 'nonce' );
-
-	$site_id = isset( $_POST['siteId'] ) ? absint( $_POST['siteId'] ) : 0;
-	$query   = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
-
-	if ( ! $site_id || mb_strlen( $query ) < 2 ) {
-		wp_send_json( [] );
-	}
-
-	// Strip common Bulgarian street type prefixes so the API gets
-	// just the actual street name for matching.
-	$prefixes = [
-		// Cyrillic
-		'улица',  'ул\.',  'ул ',
-		'булевард', 'бул\.',  'бул ',
-		'площад', 'пл\.',  'пл ',
-		'жк',     'ж\.к\.',
-		// Latin transliterations
-		'ulitsa', 'ulica', 'ul\.',  'ul ',
-		'bulevard', 'boulevard', 'bul\.',  'bul ',
-		'ploshtad', 'pl\.',  'pl ',
-	];
-	$pattern = '/^(' . implode( '|', $prefixes ) . ')\s*/iu';
-	$clean_query = preg_replace( $pattern, '', $query );
-
-	// If everything was stripped, use original
-	if ( empty( trim( $clean_query ) ) ) {
-		$clean_query = $query;
-	}
-
-	$credentials = drushfs_get_first_credentials();
-	if ( ! $credentials ) {
-		wp_send_json( [] );
-	}
-
-	$payload = [
-		'userName' => $credentials['username'],
-		'password' => $credentials['password'],
-		'siteId'   => $site_id,
-		'name'     => trim( $clean_query ),
-	];
-
-	$response = wp_remote_post( 'https://api.speedy.bg/v1/location/street', [
-		'headers' => [ 'Content-Type' => 'application/json' ],
-		'body'    => wp_json_encode( $payload ),
-		'timeout' => 10,
-	] );
-
-	if ( is_wp_error( $response ) ) {
-		wp_send_json( [] );
-	}
-
-	$body = json_decode( wp_remote_retrieve_body( $response ), true );
-
-	$results = [];
-	if ( ! empty( $body['streets'] ) && is_array( $body['streets'] ) ) {
-		foreach ( $body['streets'] as $street ) {
-			$label = $street['type'] ?? '';
-			if ( ! empty( $label ) ) {
-				$label .= ' ';
-			}
-			$label .= $street['name'] ?? '';
-
-			$results[] = [
-				'id'   => $street['id'] ?? 0,
-				'name' => $street['name'] ?? '',
-				'type' => $street['type'] ?? '',
-				'label' => trim( $label ),
-			];
-		}
-	}
-
-	wp_send_json( $results );
-}
 function drushfs_validate_checkout(): void {
 	// Check if Drusoft Shipping for Speedy is the selected shipping method
 	$chosen_methods = WC()->session->get( 'chosen_shipping_methods' );
@@ -1613,71 +1322,10 @@ function drushfs_validate_checkout(): void {
  * AJAX Handler: Select a Speedy service.
  * Updates the session with the chosen service and returns the new cost.
  */
-add_action( 'wp_ajax_drushfs_select_service', 'drushfs_select_service_ajax' );
-add_action( 'wp_ajax_nopriv_drushfs_select_service', 'drushfs_select_service_ajax' );
-
-function drushfs_select_service_ajax(): void {
-	check_ajax_referer( 'drushfs_public', 'nonce' );
-
-	$service_id = isset( $_POST['service_id'] ) ? absint( $_POST['service_id'] ) : 0;
-
-	if ( ! $service_id || ! WC()->session ) {
-		wp_send_json_error( __( 'Invalid service ID', 'drusoft-shipping-for-sameday' ) );
-	}
-
-	$service_options = WC()->session->get( 'drushfs_service_options', [] );
-
-	if ( ! isset( $service_options[ $service_id ] ) ) {
-		wp_send_json_error( __( 'Service not available', 'drusoft-shipping-for-sameday' ) );
-	}
-
-	$selected = $service_options[ $service_id ];
-
-	// Update session
-	WC()->session->set( 'drushfs_selected_service', $service_id );
-	WC()->session->set( 'drushfs_shipping_cost', $selected['cost'] );
-
-	// Update the shipping data payload for waybill
-	$payload = WC()->session->get( 'drushfs_shipping_data_' . $service_id );
-	if ( $payload ) {
-		WC()->session->set( 'drushfs_shipping_data', $payload );
-	}
-
-	// Invalidate WC shipping rate cache so the next update_checkout
-	// actually re-calls calculate_shipping with the new selection.
-	$packages = WC()->cart ? WC()->cart->get_shipping_packages() : [];
-	foreach ( $packages as $key => $package ) {
-		WC()->session->set( 'shipping_for_package_' . $key, false );
-	}
-
-	wp_send_json_success( [
-		'service_id' => $service_id,
-		'cost'       => $selected['cost'],
-		'name'       => $selected['name'],
-	] );
-}
 
 /**
  * AJAX Handler: Get available Speedy service options from session.
  */
-add_action( 'wp_ajax_drushfs_get_services', 'drushfs_get_services_ajax' );
-add_action( 'wp_ajax_nopriv_drushfs_get_services', 'drushfs_get_services_ajax' );
-
-function drushfs_get_services_ajax(): void {
-	check_ajax_referer( 'drushfs_public', 'nonce' );
-
-	if ( ! WC()->session ) {
-		wp_send_json_error( __( 'No session', 'drusoft-shipping-for-sameday' ) );
-	}
-
-	$service_options = WC()->session->get( 'drushfs_service_options', [] );
-	$selected        = WC()->session->get( 'drushfs_selected_service', 0 );
-
-	wp_send_json_success( [
-		'services' => array_values( $service_options ),
-		'selected' => (int) $selected,
-	] );
-}
 
 /**
  * Save Order Meta

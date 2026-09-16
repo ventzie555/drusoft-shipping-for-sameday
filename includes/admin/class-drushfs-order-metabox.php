@@ -5,10 +5,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Adds a Speedy shipment meta box to the WooCommerce order edit page.
+ * Adds a Sameday shipment meta box to the WooCommerce order edit page.
  *
  * Displays waybill status and provides Generate, Print, Cancel,
- * and Request Courier buttons directly on the order screen.
+ * buttons directly on the order screen.
  */
 class Drushfs_Order_Metabox {
 
@@ -27,27 +27,27 @@ class Drushfs_Order_Metabox {
 			return;
 		}
 
-		// Only show the meta box if the order uses Speedy shipping
+		// Only show the meta box if the order shipped with Sameday
 		$order = self::get_current_order();
 		if ( ! $order ) {
 			return;
 		}
 
-		$has_speedy = false;
+		$has_sameday = false;
 		foreach ( $order->get_shipping_methods() as $method ) {
 			if ( 'drushfs_sameday' === $method->get_method_id() ) {
-				$has_speedy = true;
+				$has_sameday = true;
 				break;
 			}
 		}
 
-		if ( ! $has_speedy ) {
+		if ( ! $has_sameday ) {
 			return;
 		}
 
 		add_meta_box(
 			'drushfs-shipment',
-			__( 'Speedy Shipment', 'drusoft-shipping-for-sameday' ),
+			__( 'Sameday Shipment', 'drusoft-shipping-for-sameday' ),
 			[ __CLASS__, 'render' ],
 			$screen,
 			'side',
@@ -115,13 +115,12 @@ class Drushfs_Order_Metabox {
 
 		$order_id   = $order->get_id();
 		$waybill_id = $order->get_meta( '_drushfs_waybill_id' );
-		$courier_requested = ( 'yes' === $order->get_meta( '_drushfs_courier_requested' ) );
 
-		echo '<div id="speedy-metabox-content">';
+		echo '<div id="sameday-metabox-content">';
 
 		if ( $waybill_id ) {
 			// Waybill exists — show info and actions
-			$track_url = 'https://www.speedy.bg/track?id=' . urlencode( $waybill_id );
+			$track_url = 'https://sameday.bg/awb-tracking/?awb=' . rawurlencode( $waybill_id );
 			$print_url = wp_nonce_url(
 				admin_url( 'admin-post.php?action=drushfs_print_waybill&order_id=' . $order_id ),
 				'drushfs_print_waybill'
@@ -130,35 +129,27 @@ class Drushfs_Order_Metabox {
 			echo '<p><strong>' . esc_html__( 'Waybill:', 'drusoft-shipping-for-sameday' ) . '</strong> ';
 			echo '<a href="' . esc_url( $track_url ) . '" target="_blank">' . esc_html( $waybill_id ) . '</a></p>';
 
-			echo '<div class="speedy-metabox-actions" style="display: flex; flex-direction: column; gap: 6px;">';
+			echo '<div class="sameday-metabox-actions" style="display: flex; flex-direction: column; gap: 6px;">';
 
 			// Print
 			echo '<a href="' . esc_url( $print_url ) . '" target="_blank" class="button" style="text-align:center;">'
 			     . esc_html__( 'Print Waybill', 'drusoft-shipping-for-sameday' ) . '</a>';
 
-			// Request Courier
-			if ( $courier_requested ) {
-				echo '<span class="button disabled" style="text-align:center; color: green;">'
-				     . esc_html__( 'Courier Requested', 'drusoft-shipping-for-sameday' ) . '</span>';
-			} else {
-				echo '<button type="button" class="button speedy-order-request-courier" data-order-id="' . esc_attr( $order_id ) . '">'
-				     . esc_html__( 'Request Courier', 'drusoft-shipping-for-sameday' ) . '</button>';
-			}
 
 			// Cancel
-			echo '<button type="button" class="button speedy-order-cancel" data-order-id="' . esc_attr( $order_id ) . '" style="color: #a00;">'
+			echo '<button type="button" class="button sameday-order-cancel" data-order-id="' . esc_attr( $order_id ) . '" style="color: #a00;">'
 			     . esc_html__( 'Cancel Shipment', 'drusoft-shipping-for-sameday' ) . '</button>';
 
 			echo '</div>';
 		} else {
 			// No waybill — show generate button
 			echo '<p>' . esc_html__( 'No waybill generated yet.', 'drusoft-shipping-for-sameday' ) . '</p>';
-			echo '<button type="button" class="button button-primary speedy-order-generate" data-order-id="' . esc_attr( $order_id ) . '">'
+			echo '<button type="button" class="button button-primary sameday-order-generate" data-order-id="' . esc_attr( $order_id ) . '">'
 			     . esc_html__( 'Generate Waybill', 'drusoft-shipping-for-sameday' ) . '</button>';
 		}
 
 		echo '</div>';
-		echo '<div id="speedy-metabox-notice" style="margin-top: 8px;"></div>';
+		echo '<div id="sameday-metabox-notice" style="margin-top: 8px;"></div>';
 	}
 
 	/**
@@ -182,10 +173,12 @@ class Drushfs_Order_Metabox {
 			'ajax_url' => admin_url( 'admin-ajax.php' ),
 			'nonce'    => wp_create_nonce( 'drushfs_actions' ),
 			'i18n'     => [
-				'confirm_cancel'    => __( 'Are you sure you want to cancel this shipment?', 'drusoft-shipping-for-sameday' ),
+				'confirm_cancel' => __( 'Are you sure you want to cancel this shipment?', 'drusoft-shipping-for-sameday' ),
+				'generate'       => __( 'Generate Waybill', 'drusoft-shipping-for-sameday' ),
+				'cancel'         => __( 'Cancel Shipment', 'drusoft-shipping-for-sameday' ),
+				'no_waybill'     => __( 'No waybill generated yet.', 'drusoft-shipping-for-sameday' ),
+				'request_failed' => __( 'The request failed. Please try again.', 'drusoft-shipping-for-sameday' ),
 				'generating'        => __( 'Generating...', 'drusoft-shipping-for-sameday' ),
-				'requesting'        => __( 'Requesting...', 'drusoft-shipping-for-sameday' ),
-				'courier_requested' => __( 'Courier Requested', 'drusoft-shipping-for-sameday' ),
 				'cancelling'        => __( 'Cancelling...', 'drusoft-shipping-for-sameday' ),
 			],
 		] );
