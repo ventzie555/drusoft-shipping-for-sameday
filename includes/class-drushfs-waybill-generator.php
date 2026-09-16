@@ -1,70 +1,87 @@
 <?php
+/**
+ * Creates Sameday waybills for orders.
+ *
+ * The payload is built from the ORDER, not from the quote taken at checkout.
+ * That is deliberate and was learned the expensive way on the Speedy side: a
+ * quote-time payload carries the cart subtotal before VAT and before shipping,
+ * so order 15961 shipped a 172.81 € order with a 141.66 € cash-on-delivery —
+ * quietly undercollecting more than the order's whole margin. At waybill time
+ * the order total is one call away, so it is imposed here.
+ *
+ * Sameday cannot repeat the other Speedy trap — billing the recipient for the
+ * courier while the customer had already paid for delivery at checkout —
+ * because awbPayment accepts only 1, "the client with the contract pays".
+ *
+ * @package Drusoft_Shipping_For_Sameday
+ */
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
+	exit;
 }
 
 if ( ! class_exists( 'Drushfs_Waybill_Generator' ) ) {
 
+	/**
+	 * Order to waybill.
+	 */
 	class Drushfs_Waybill_Generator {
 
-		/**
-		 * The single instance of the class.
-		 */
-		protected static $_instance = null;
+		/** Singleton. */
+		protected static $instance = null;
 
 		/**
-		 * Main Drushfs_Waybill_Generator Instance.
+		 * Instance.
+		 *
+		 * @return Drushfs_Waybill_Generator|null
 		 */
 		public static function instance(): ?Drushfs_Waybill_Generator {
-			if ( is_null( self::$_instance ) ) {
-				self::$_instance = new self();
+			if ( is_null( self::$instance ) ) {
+				self::$instance = new self();
 			}
-			return self::$_instance;
+			return self::$instance;
 		}
 
 		/**
 		 * Constructor.
 		 */
 		public function __construct() {
-			// This hook will trigger waybill generation
 			add_action( 'woocommerce_order_status_changed', array( $this, 'on_order_status_changed' ), 10, 4 );
 		}
 
 		/**
-		 * Hook that fires when an order's status changes.
+		 * Generate automatically when the shop asked for it.
 		 *
-		 * @param int      $order_id    Order ID.
-		 * @param string   $status_from Old status.
+		 * @param int      $order_id    Order id.
+		 * @param string   $status_from Previous status.
 		 * @param string   $status_to   New status.
-		 * @param WC_Order $order       Order object.
+		 * @param WC_Order $order       Order.
 		 */
 		public function on_order_status_changed( int $order_id, string $status_from, string $status_to, WC_Order $order ): void {
-			// Get the shipping method instance settings
-			$shipping_methods = $order->get_shipping_methods();
-			$shipping_method  = reset( $shipping_methods ); // Get the first shipping method
+			unset( $status_from );
 
-			if ( ! $shipping_method || 'drushfs_sameday' !== $shipping_method->get_method_id() ) {
+			if ( ! self::shipping_method_of( $order ) ) {
 				return;
 			}
 
-			$instance_id = $shipping_method->get_instance_id();
-			$settings    = get_option( 'woocommerce_drushfs_sameday_' . $instance_id . '_settings' );
+			$settings = self::settings_for_order( $order );
 
-			// Trigger on 'processing' or 'on-hold' if auto-generation is enabled
-			$should_generate = ( 'yes' === ( $settings['generate_waybill'] ?? 'no' ) );
-			$is_target_status = in_array( $status_to, [ 'processing', 'on-hold' ], true );
-
-			if ( $should_generate && $is_target_status ) {
-				$this->generate_waybill( $order_id );
+			if ( 'yes' !== ( $settings['generate_waybill'] ?? 'no' ) ) {
+				return;
 			}
+
+			if ( ! in_array( $status_to, array( 'processing', 'on-hold' ), true ) ) {
+				return;
+			}
+
+			$this->generate_waybill( $order_id );
 		}
 
 		/**
-		 * Generate the waybill for a given order.
+		 * Create the waybill.
 		 *
-		 * @param int $order_id The ID of the order.
-		 * @return string|WP_Error The waybill ID on success, or a WP_Error on failure.
+		 * @param int $order_id Order id.
+		 * @return string|WP_Error Waybill number, or an error.
 		 */
 		public function generate_waybill( int $order_id ) {
 			$order = wc_get_order( $order_id );
@@ -73,316 +90,308 @@ if ( ! class_exists( 'Drushfs_Waybill_Generator' ) ) {
 				return new WP_Error( 'invalid_order', __( 'Invalid order ID.', 'drusoft-shipping-for-sameday' ) );
 			}
 
-			// Prevent re-generation if a waybill already exists
-			if ( $order->get_meta( '_drushfs_waybill_id' ) ) {
-				return $order->get_meta( '_drushfs_waybill_id' );
+			$existing = (string) $order->get_meta( '_drushfs_waybill_id' );
+			if ( '' !== $existing ) {
+				return $existing;
 			}
 
-			// Retrieve the payload saved during checkout
-			$payload = $order->get_meta( '_drushfs_order_data' );
-			if ( empty( $payload ) ) {
-				return new WP_Error( 'no_payload', __( 'No Speedy shipping data found for this order.', 'drusoft-shipping-for-sameday' ) );
+			$creds = self::credentials_for_order( $order );
+			if ( ! $creds ) {
+				return new WP_Error( 'no_credentials', __( 'Sameday credentials are not configured.', 'drusoft-shipping-for-sameday' ) );
 			}
 
-			// Get credentials from the specific shipping instance
-			$shipping_methods = $order->get_shipping_methods();
-			$shipping_method  = reset( $shipping_methods );
-			$instance_id      = $shipping_method->get_instance_id();
-			$settings         = get_option( 'woocommerce_drushfs_sameday_' . $instance_id . '_settings' );
-
-			$username = $settings['speedy_username'] ?? '';
-			$password = $settings['speedy_password'] ?? '';
-
-			if ( ! $username || ! $password ) {
-				return new WP_Error( 'no_credentials', __( 'Speedy credentials are not configured for this shipping method.', 'drusoft-shipping-for-sameday' ) );
+			$payload = $this->build_payload( $order );
+			if ( is_wp_error( $payload ) ) {
+				$order->add_order_note( __( 'Sameday waybill error: ', 'drusoft-shipping-for-sameday' ) . $payload->get_error_message() );
+				return $payload;
 			}
 
-			// --- Finalize the Payload ---
-			$payload['userName'] = $username;
-			$payload['password'] = $password;
-
-			// Remove internal tracking keys (not part of the API)
-			unset( $payload['_selected_service_id'] );
-
-			// Split shipments: secondary parcels embedded at quote time.
-			$split_parcels = $payload['_split_parcels'] ?? [];
-			unset( $payload['_split_parcels'] );
-
-			// Apply the order's pickup profile (may have been changed by the
-			// admin after checkout) — rebuild the sender block from it.
-			$pickup_profile = (string) $order->get_meta( '_drushfs_pickup_profile' );
-			if ( '' !== $pickup_profile && class_exists( 'Drushfs_Shipping_Method' ) ) {
-				$method = new Drushfs_Shipping_Method( $instance_id );
-				$sender = $method->pickup_sender_block( $pickup_profile );
-				if ( ! empty( $sender ) ) {
-					$payload['sender'] = $sender;
-				}
-			}
-
-			// COD must be what the courier actually collects: the ORDER TOTAL.
-			// The saved payload was built during calculate_shipping(), where the
-			// cart's grand total does not exist yet, so it carries the items
-			// subtotal EX VAT — on order 15961 that shipped a 172.81 € COD as
-			// 141.66 € (VAT and shipping missing), quietly undercollecting more
-			// than the order's entire margin. At waybill time the truth is one
-			// call away, so impose it here instead of trusting the quote-time
-			// approximation. includeShippingPrice=true tells Speedy to add the
-			// courier price itself, so in that mode our shipping charge must
-			// stay out of the amount.
-			// A COD order whose payload carries no COD service at all is the
-			// worse variant of the same staleness: the quote was built while a
-			// CARD method was selected (the checkout default) and the customer
-			// switched to наложен платеж at the end. The rebuild-on-payment-
-			// change trigger keys off the payer flipping RECIPIENT<->SENDER, so
-			// any configuration in which both methods resolve to the same payer
-			// suppresses it — order 16334 (171.99 €) got a waybill with no COD
-			// whatsoever, which the courier would have delivered for free.
-			// The order object is the truth: it says COD, the waybill says COD.
-			if ( 'cod' === $order->get_payment_method()
-				&& ! isset( $payload['service']['additionalServices']['cod'] ) ) {
-				$payload['service']['additionalServices']['cod'] = [
-					'processingType'        => ( 'YES' === ( $settings['moneytransfer'] ?? 'NO' ) )
-						? 'POSTAL_MONEY_TRANSFER' : 'CASH',
-					'ignoreIfNotApplicable' => true,
-				];
-			}
-
-			if ( isset( $payload['service']['additionalServices']['cod'] ) ) {
-				$cod_total = (float) $order->get_total();
-				if ( ! empty( $payload['service']['additionalServices']['cod']['includeShippingPrice'] ) ) {
-					$cod_total -= (float) $order->get_shipping_total() + (float) $order->get_shipping_tax();
-				}
-				$payload['service']['additionalServices']['cod']['amount'] = round( $cod_total, 2 );
-			}
-
-			// Who pays the courier — settled here for the same reason as the COD
-			// amount above: the quote-time guess cannot see what the cart ended
-			// up charging for delivery.
-			//
-			// Billing the recipient is only honest when the order charged them
-			// nothing for shipping. Any shipping line means the customer has
-			// already paid us for delivery, and handing Speedy's fee to them as
-			// well makes them pay for it twice — once at checkout, once at the
-			// counter, with no warning on either side.
-			//
-			// That is not hypothetical. Order 15961 totalled 172.81 € including
-			// 2.82 € of shipping; Speedy then billed the customer a further
-			// 4.48 € on collection and mailed him a demand for 177.29 €. He
-			// queried it. Two earlier customers had already paid the surcharge
-			// and said nothing.
-			if ( (float) $order->get_shipping_total() > 0
-				&& 'RECIPIENT' === ( $payload['payment']['courierServicePayer'] ?? '' ) ) {
-				$payload['payment']['courierServicePayer'] = 'SENDER';
-			}
-
-			// With the merchant paying the courier, COD must be the plain order
-			// total and nothing else. includeShippingPrice asks Speedy to add
-			// ITS OWN courier price to the collected amount — meaningful only
-			// when the recipient pays the courier. Sent together with SENDER,
-			// Speedy treats the service as not applicable, and because the
-			// payload carries ignoreIfNotApplicable=true it DROPS COD silently
-			// rather than erroring: waybill 63707943299 (order 16334, 171.99 €)
-			// went out with no naложен платеж at all — the courier would have
-			// handed over the parcel without collecting a стотинка. Caught
-			// before pickup; this keeps the combination impossible.
-			if ( 'SENDER' === ( $payload['payment']['courierServicePayer'] ?? '' )
-				&& isset( $payload['service']['additionalServices']['cod'] ) ) {
-				unset( $payload['service']['additionalServices']['cod']['includeShippingPrice'] );
-				$payload['service']['additionalServices']['cod']['amount'] =
-					round( (float) $order->get_total(), 2 );
-			}
-
-			// Convert calculate payload format to shipment format:
-			// The calculate endpoint uses service.serviceIds (array),
-			// but the shipment endpoint requires service.serviceId (single int).
-			if ( isset( $payload['service']['serviceIds'] ) && is_array( $payload['service']['serviceIds'] ) ) {
-				$payload['service']['serviceId'] = $payload['service']['serviceIds'][0];
-				unset( $payload['service']['serviceIds'] );
-			}
-
-			// Inspection before payment (OBPD). Injected at waybill time — like the
-			// COD amount above — so the merchant's current setting applies even to
-			// orders checked out before the option existed. Only meaningful on COD
-			// shipments, and impossible at automats (no staff to open with).
-			$obpd = (string) ( $settings['obpd_option'] ?? 'NONE' );
-			if ( in_array( $obpd, [ 'OPEN', 'TEST' ], true )
-				&& isset( $payload['service']['additionalServices']['cod'] )
-				&& 'automat' !== $order->get_meta( '_drushfs_delivery_type' ) ) {
-				$payload['service']['additionalServices']['obpd'] = [
-					'option'                  => $obpd,
-					'returnShipmentServiceId' => (int) ( $payload['service']['serviceId'] ?? 505 ),
-					'returnShipmentPayer'     => 'SENDER',
-				];
-			}
-
-			// Add package type to content (only needed for shipment, not calculate)
-			if ( ! isset( $payload['content']['package'] ) ) {
-				$payload['content']['package'] = $settings['opakovka'] ?? 'BOX';
-			}
-
-			// Automats cannot accept pallets — fall back to BOX.
-			if ( 'PALLET' === $payload['content']['package'] && isset( $payload['recipient']['pickupOfficeId'] ) ) {
-				$delivery_type = $order->get_meta( '_drushfs_delivery_type' );
-				if ( 'automat' === $delivery_type ) {
-					$payload['content']['package'] = 'BOX';
-				}
-			}
-
-			// Add contents description (required by /v1/shipment)
-			if ( empty( $payload['content']['contents'] ) ) {
-				$items = [];
-				foreach ( $order->get_items() as $item ) {
-					$items[] = $item->get_name() . ' x' . $item->get_quantity();
-				}
-				$description = implode( ', ', $items );
-				if ( empty( $description ) ) {
-					$description = __( 'Order #', 'drusoft-shipping-for-sameday' ) . $order->get_order_number();
-				}
-				// Speedy limits this field — truncate to 100 chars
-				$payload['content']['contents'] = mb_substr( $description, 0, 100 );
-			}
-
-			// Add recipient details from the order
-			$payload['recipient']['clientName']       = $order->get_formatted_shipping_full_name();
-			$payload['recipient']['phone1']['number'] = $order->get_billing_phone();
-			$payload['recipient']['email']            = $order->get_billing_email();
-
-			// Add order reference
-			$payload['ref1'] = __( 'Order #', 'drusoft-shipping-for-sameday' ) . $order->get_order_number();
-
-			// If delivery is to address, use addressNote
-			if ( isset( $payload['recipient']['addressLocation'] ) ) {
-				$full_address = $order->get_shipping_address_1();
-				if ( $order->get_shipping_address_2() ) {
-					$full_address .= ', ' . $order->get_shipping_address_2();
-				}
-				$payload['recipient']['addressLocation']['addressNote'] = $full_address;
-			}
-
-			// --- Make the API Call ---
-
-			$response = wp_remote_post( 'https://api.speedy.bg/v1/shipment/', [
-				'headers' => [
-					'Content-Type' => 'application/json',
-					'Accept'       => 'application/json',
-				],
-				'body'    => wp_json_encode( $payload ),
-				'timeout' => 20,
-			] );
+			$response = Drushfs_Api::create_awb( $creds, $payload );
 
 			if ( is_wp_error( $response ) ) {
-				$order->add_order_note( __( 'Speedy Waybill Error: ', 'drusoft-shipping-for-sameday' ) . $response->get_error_message() );
+				$order->add_order_note( __( 'Sameday waybill error: ', 'drusoft-shipping-for-sameday' ) . $response->get_error_message() );
 				return $response;
 			}
 
-			$body = json_decode( wp_remote_retrieve_body( $response ), true );
-
-			// --- Handle API Response ---
-			if ( isset( $body['error'] ) ) {
-				$error_message = $body['error']['message'] ?? __( 'Unknown API error', 'drusoft-shipping-for-sameday' );
-				$order->add_order_note( __( 'Speedy Waybill Error: ', 'drusoft-shipping-for-sameday' ) . $error_message );
-				return new WP_Error( 'api_error', $error_message );
+			$awb = (string) ( $response['awbNumber'] ?? '' );
+			if ( '' === $awb ) {
+				return new WP_Error( 'unexpected_response', __( 'Sameday did not return a waybill number.', 'drusoft-shipping-for-sameday' ) );
 			}
 
-			if ( isset( $body['id'] ) ) {
-				$waybill_id  = $body['id'];
-				$waybill_ids = [ $waybill_id ];
+			$order->update_meta_data( '_drushfs_waybill_id', $awb );
+			$order->update_meta_data( '_drushfs_waybill_response', $response );
+			$order->add_order_note(
+				sprintf(
+					/* translators: 1: waybill number, 2: cost charged by Sameday */
+					__( 'Sameday waybill created: %1$s (%2$s).', 'drusoft-shipping-for-sameday' ),
+					$awb,
+					wc_price( (float) ( $response['awbCost'] ?? 0 ) )
+				)
+			);
+			$order->save();
 
-				// Save the waybill ID and the full response to the order
-				$order->update_meta_data( '_drushfs_waybill_id', $waybill_id );
-				$order->update_meta_data( '_drushfs_waybill_response', $body );
-				$order->add_order_note( __( 'Speedy Waybill Created: ', 'drusoft-shipping-for-sameday' ) . $waybill_id );
+			return $awb;
+		}
 
-				// Secondary parcels (split shipments): same recipient and
-				// service, own sender/contents/COD — one waybill each.
-				$parcel_no = 1;
-				foreach ( $split_parcels as $parcel ) {
-					$parcel_no++;
-					$parcel['userName'] = $username;
-					$parcel['password'] = $password;
-					// Secondary parcels carry their own quote-time payload, so the
-					// courier-payer correction applied to the primary above has to
-					// be repeated here — otherwise a split order would hand the
-					// customer a counter charge on every parcel but the first.
-					if ( (float) $order->get_shipping_total() > 0
-						&& 'RECIPIENT' === ( $parcel['payment']['courierServicePayer'] ?? '' ) ) {
-						$parcel['payment']['courierServicePayer'] = 'SENDER';
-					}
-					// Same COD sanitisation as the primary: includeShippingPrice
-					// together with SENDER makes Speedy silently drop the whole
-					// COD service (ignoreIfNotApplicable) — see order 16334.
-					if ( 'SENDER' === ( $parcel['payment']['courierServicePayer'] ?? '' )
-						&& isset( $parcel['service']['additionalServices']['cod'] ) ) {
-						unset( $parcel['service']['additionalServices']['cod']['includeShippingPrice'] );
-					}
-					if ( isset( $parcel['service']['serviceIds'] ) && is_array( $parcel['service']['serviceIds'] ) ) {
-						$parcel['service']['serviceId'] = $parcel['service']['serviceIds'][0];
-						unset( $parcel['service']['serviceIds'] );
-					}
-					if ( ! isset( $parcel['content']['package'] ) ) {
-						$parcel['content']['package'] = $settings['opakovka'] ?? 'BOX';
-					}
-					if ( 'PALLET' === $parcel['content']['package'] && isset( $parcel['recipient']['pickupOfficeId'] )
-						&& 'automat' === $order->get_meta( '_drushfs_delivery_type' ) ) {
-						$parcel['content']['package'] = 'BOX';
-					}
-					// Same inspection-before-payment rule as the primary parcel:
-					// a customer must get identical treatment on every box of one order.
-					if ( in_array( $obpd, [ 'OPEN', 'TEST' ], true )
-						&& isset( $parcel['service']['additionalServices']['cod'] )
-						&& 'automat' !== $order->get_meta( '_drushfs_delivery_type' ) ) {
-						$parcel['service']['additionalServices']['obpd'] = [
-							'option'                  => $obpd,
-							'returnShipmentServiceId' => (int) ( $parcel['service']['serviceId'] ?? 505 ),
-							'returnShipmentPayer'     => 'SENDER',
-						];
-					}
-					$parcel['recipient']['clientName']       = $order->get_formatted_shipping_full_name();
-					$parcel['recipient']['phone1']['number'] = $order->get_billing_phone();
-					$parcel['recipient']['email']            = $order->get_billing_email();
-					/* translators: 1: order number, 2: parcel number */
-					$parcel['ref1'] = sprintf( __( 'Order #%1$s / parcel %2$d', 'drusoft-shipping-for-sameday' ), $order->get_order_number(), $parcel_no );
-					if ( isset( $parcel['recipient']['addressLocation'] ) ) {
-						$full_address = $order->get_shipping_address_1();
-						if ( $order->get_shipping_address_2() ) {
-							$full_address .= ', ' . $order->get_shipping_address_2();
-						}
-						$parcel['recipient']['addressLocation']['addressNote'] = $full_address;
-					}
+		/**
+		 * Build the shipment payload from the order.
+		 *
+		 * @param WC_Order $order Order.
+		 * @return array|WP_Error
+		 */
+		private function build_payload( WC_Order $order ) {
+			$settings = self::settings_for_order( $order );
 
-					$p_response = wp_remote_post( 'https://api.speedy.bg/v1/shipment/', [
-						'headers' => [
-							'Content-Type' => 'application/json',
-							'Accept'       => 'application/json',
-						],
-						'body'    => wp_json_encode( $parcel ),
-						'timeout' => 20,
-					] );
-					$p_body = is_wp_error( $p_response ) ? null : json_decode( wp_remote_retrieve_body( $p_response ), true );
-					if ( is_wp_error( $p_response ) || ! empty( $p_body['error'] ) || empty( $p_body['id'] ) ) {
-						$p_msg = is_wp_error( $p_response )
-							? $p_response->get_error_message()
-							: ( $p_body['error']['message'] ?? __( 'Unknown API error', 'drusoft-shipping-for-sameday' ) );
-						/* translators: 1: parcel number, 2: error message */
-						$order->add_order_note( sprintf( __( 'Speedy Waybill Error (parcel %1$d): %2$s — create it manually.', 'drusoft-shipping-for-sameday' ), $parcel_no, $p_msg ) );
-						continue;
-					}
-					$waybill_ids[] = $p_body['id'];
-					/* translators: 1: parcel number, 2: waybill id */
-					$order->add_order_note( sprintf( __( 'Speedy Waybill Created (parcel %1$d): %2$s', 'drusoft-shipping-for-sameday' ), $parcel_no, $p_body['id'] ) );
-				}
-				if ( count( $waybill_ids ) > 1 ) {
-					$order->update_meta_data( '_drushfs_waybill_ids', $waybill_ids );
-				}
-				$order->save();
-
-				return $waybill_id;
+			$pickup = (int) ( $settings['pickup_point'] ?? 0 );
+			if ( ! $pickup ) {
+				return new WP_Error( 'no_pickup_point', __( 'No Sameday pickup point is configured.', 'drusoft-shipping-for-sameday' ) );
 			}
 
-			return new WP_Error( 'unexpected_response', __( 'Unexpected response from Speedy API.', 'drusoft-shipping-for-sameday' ) );
+			$type = $this->delivery_type_of( $order );
+
+			$service = Drushfs_Shipping_Method::SERVICE_ADDRESS;
+			if ( 'easybox' === $type ) {
+				$service = Drushfs_Shipping_Method::SERVICE_LOCKER;
+			} elseif ( 'pudo' === $type ) {
+				$service = Drushfs_Shipping_Method::SERVICE_PUDO;
+			}
+
+			$city   = $order->get_shipping_city() ?: $order->get_billing_city();
+			$county = $this->county_for_city( $city, $order->get_shipping_state() ?: $order->get_billing_state() );
+
+			$address = trim( $order->get_shipping_address_1() . ' ' . $order->get_shipping_address_2() );
+			if ( '' === $address ) {
+				$address = trim( $order->get_billing_address_1() . ' ' . $order->get_billing_address_2() );
+			}
+
+			// Sameday refuses a locker shipment whose recipient has no e-mail,
+			// and buries the reason deep in its validation tree.
+			$email = $order->get_billing_email();
+			if ( '' === $email ) {
+				$email = get_option( 'admin_email' );
+			}
+
+			$weight = $this->order_weight( $order, (float) ( $settings['default_weight'] ?? 1 ) );
+
+			$payload = array(
+				'pickupPoint'             => $pickup,
+				'packageType'             => 0,
+				'packageNumber'           => 1,
+				'packageWeight'           => $weight,
+				'service'                 => $service,
+				'awbPayment'              => 1,
+				'cashOnDelivery'          => $this->cod_amount( $order ),
+				'insuredValue'            => $this->declared_value( $order, $settings ),
+				'thirdPartyPickup'        => 0,
+				'clientInternalReference' => (string) $order->get_order_number(),
+				'awbRecipient'            => array(
+					'name'         => $order->get_formatted_shipping_full_name() ?: $order->get_formatted_billing_full_name(),
+					'phoneNumber'  => $order->get_billing_phone(),
+					'email'        => $email,
+					'personType'   => 0,
+					'cityString'   => $city,
+					'countyString' => $county,
+					'address'      => $address ?: '-',
+					'postalCode'   => $order->get_shipping_postcode() ?: $order->get_billing_postcode(),
+				),
+				'parcels'                 => array(
+					array( 'weight' => $weight ),
+				),
+			);
+
+			if ( in_array( $type, array( 'easybox', 'pudo' ), true ) ) {
+				$ooh = (int) $order->get_meta( '_drushfs_office_id' );
+				if ( ! $ooh ) {
+					return new WP_Error(
+						'no_locker',
+						__( 'This order is set for locker delivery but carries no locker choice.', 'drusoft-shipping-for-sameday' )
+					);
+				}
+				$payload['oohLastMile'] = $ooh;
+			}
+
+			$contents = array();
+			foreach ( $order->get_items() as $item ) {
+				$contents[] = $item->get_name() . ' x' . $item->get_quantity();
+			}
+			if ( $contents ) {
+				$payload['packageDetails'] = mb_substr( implode( ', ', $contents ), 0, 100 );
+			}
+
+			return $payload;
+		}
+
+		/**
+		 * Cash on delivery: the order total, or zero when the customer is not
+		 * paying cash on delivery.
+		 *
+		 * @param WC_Order $order Order.
+		 * @return float
+		 */
+		private function cod_amount( WC_Order $order ): float {
+			if ( 'cod' !== $order->get_payment_method() ) {
+				return 0.0;
+			}
+
+			return round( (float) $order->get_total(), 2 );
+		}
+
+		/**
+		 * Declared value per the shop's insurance setting.
+		 *
+		 * @param WC_Order $order    Order.
+		 * @param array    $settings Method settings.
+		 * @return float
+		 */
+		private function declared_value( WC_Order $order, array $settings ): float {
+			$mode = (string) ( $settings['insure'] ?? 'no' );
+
+			if ( 'no' === $mode ) {
+				return 0.0;
+			}
+
+			$total = (float) $order->get_total();
+
+			if ( 'threshold' === $mode && $total < (float) ( $settings['insure_from'] ?? 300 ) ) {
+				return 0.0;
+			}
+
+			return round( $total, 2 );
+		}
+
+		/**
+		 * Total weight of the order.
+		 *
+		 * @param WC_Order $order   Order.
+		 * @param float    $default Default per item when a product has no weight.
+		 * @return float
+		 */
+		private function order_weight( WC_Order $order, float $default ): float {
+			$weight = 0.0;
+
+			foreach ( $order->get_items() as $item ) {
+				$product = $item->get_product();
+				$each    = $product ? (float) $product->get_weight() : 0.0;
+				$weight += ( $each > 0 ? $each : $default ) * (int) $item->get_quantity();
+			}
+
+			return $weight > 0 ? $weight : max( 0.1, $default );
+		}
+
+		/**
+		 * Which delivery type the customer chose.
+		 *
+		 * Prefers the meta written at checkout, and falls back to the rate id,
+		 * which ends in the type (drushfs_sameday:3:easybox).
+		 *
+		 * @param WC_Order $order Order.
+		 * @return string
+		 */
+		private function delivery_type_of( WC_Order $order ): string {
+			$type = (string) $order->get_meta( '_drushfs_delivery_type' );
+
+			if ( in_array( $type, array( 'address', 'easybox', 'pudo' ), true ) ) {
+				return $type;
+			}
+
+			$method = self::shipping_method_of( $order );
+			if ( $method ) {
+				$parts = explode( ':', (string) $method->get_method_id() . ':' . (string) $method->get_instance_id() );
+				$rate  = (string) $method->get_meta( 'delivery_type' );
+				if ( in_array( $rate, array( 'address', 'easybox', 'pudo' ), true ) ) {
+					return $rate;
+				}
+				unset( $parts );
+			}
+
+			return 'address';
+		}
+
+		/**
+		 * County for a city name.
+		 *
+		 * @param string $city  City.
+		 * @param string $state Fallback state code.
+		 * @return string
+		 */
+		private function county_for_city( string $city, string $state = '' ): string {
+			global $wpdb;
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$county = (string) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT county FROM {$wpdb->prefix}drushfs_cities WHERE name = %s ORDER BY id ASC LIMIT 1",
+					$city
+				)
+			);
+
+			return $county ?: $state;
+		}
+
+		/* -----------------------------------------------------------------
+		 * Shared helpers, also used by the admin actions
+		 * -------------------------------------------------------------- */
+
+		/**
+		 * The Sameday shipping line on an order, if any.
+		 *
+		 * @param WC_Order $order Order.
+		 * @return WC_Order_Item_Shipping|null
+		 */
+		public static function shipping_method_of( WC_Order $order ) {
+			foreach ( $order->get_shipping_methods() as $method ) {
+				if ( 'drushfs_sameday' === $method->get_method_id() ) {
+					return $method;
+				}
+			}
+
+			return null;
+		}
+
+		/**
+		 * Settings of the instance that shipped this order, falling back to the
+		 * method's global settings.
+		 *
+		 * @param WC_Order $order Order.
+		 * @return array
+		 */
+		public static function settings_for_order( WC_Order $order ): array {
+			$method = self::shipping_method_of( $order );
+
+			if ( $method ) {
+				$instance = get_option( 'woocommerce_drushfs_sameday_' . $method->get_instance_id() . '_settings' );
+				if ( is_array( $instance ) && $instance ) {
+					return $instance;
+				}
+			}
+
+			$global = get_option( 'woocommerce_drushfs_sameday_settings' );
+
+			return is_array( $global ) ? $global : array();
+		}
+
+		/**
+		 * Credentials to use for this order.
+		 *
+		 * @param WC_Order $order Order.
+		 * @return array|null
+		 */
+		public static function credentials_for_order( WC_Order $order ): ?array {
+			$settings = self::settings_for_order( $order );
+
+			if ( ! empty( $settings['sameday_username'] ) && ! empty( $settings['sameday_password'] ) ) {
+				return array(
+					'sameday_username' => $settings['sameday_username'],
+					'sameday_password' => $settings['sameday_password'],
+					'sameday_env'      => $settings['sameday_env'] ?? 'demo',
+				);
+			}
+
+			$creds = Drushfs_Syncer::credentials();
+
+			return $creds ?: null;
 		}
 	}
 }
 
-// Initialize the generator
 Drushfs_Waybill_Generator::instance();
