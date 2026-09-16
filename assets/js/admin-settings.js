@@ -183,10 +183,10 @@
 		}
 
 		// --- Grouping Logic ---
-		createVisualGroup( 'woocommerce_drushfs_speedy_free_shipping', ['free_shipping_automat', 'free_shipping_office', 'free_shipping_address'] );
-		createVisualGroup( 'woocommerce_drushfs_speedy_fixed_shipping', ['fixed_shipping_automat', 'fixed_shipping_office', 'fixed_shipping_address'] );
-		createVisualGroup( 'woocommerce_drushfs_speedy_vaucher', ['vaucherpayer', 'vaucherpayerdays'] );
-		createVisualGroup( 'woocommerce_drushfs_speedy_test_before_pay', ['testplatec', 'autoclose'] );
+		createVisualGroup( 'woocommerce_drushfs_sameday_free_shipping', ['free_shipping_automat', 'free_shipping_office', 'free_shipping_address'] );
+		createVisualGroup( 'woocommerce_drushfs_sameday_fixed_shipping', ['fixed_shipping_automat', 'fixed_shipping_office', 'fixed_shipping_address'] );
+		createVisualGroup( 'woocommerce_drushfs_sameday_vaucher', ['vaucherpayer', 'vaucherpayerdays'] );
+		createVisualGroup( 'woocommerce_drushfs_sameday_test_before_pay', ['testplatec', 'autoclose'] );
 
 
 		// --- Visibility Logic ---
@@ -233,21 +233,21 @@
 			}
 		}
 
-		setupCheckboxToggle( 'woocommerce_drushfs_speedy_free_shipping', [
+		setupCheckboxToggle( 'woocommerce_drushfs_sameday_free_shipping', [
 			'free_shipping_automat',
 			'free_shipping_office',
 			'free_shipping_address'
 		]);
 
-		setupCheckboxToggle( 'woocommerce_drushfs_speedy_fixed_shipping', [
+		setupCheckboxToggle( 'woocommerce_drushfs_sameday_fixed_shipping', [
 			'fixed_shipping_automat',
 			'fixed_shipping_office',
 			'fixed_shipping_address'
 		]);
 
 		var $pricingSelect = $( '[id$="cenadostavka"]' );
-		var $fixedCheckbox = $( '#woocommerce_drushfs_speedy_fixed_shipping' );
-		var $freeCheckbox  = $( '#woocommerce_drushfs_speedy_free_shipping' );
+		var $fixedCheckbox = $( '#woocommerce_drushfs_sameday_fixed_shipping' );
+		var $freeCheckbox  = $( '#woocommerce_drushfs_sameday_free_shipping' );
 
 		function updatePricingMethod() {
 			var method = $pricingSelect.val();

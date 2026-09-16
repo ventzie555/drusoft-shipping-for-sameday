@@ -21,7 +21,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			// Fixes the "Missing parent constructor call" warning
 			parent::__construct( $instance_id );
 
-			$this->id                 = 'drushfs_speedy';
+			$this->id                 = 'drushfs_sameday';
 			$this->instance_id        = absint( $instance_id );
 			$this->method_title       = __( 'Drusoft Shipping for Speedy', 'drusoft-shipping-for-sameday' );
 			$this->method_description = __( 'Fresh, conflict-free Speedy delivery for Bulgaria.', 'drusoft-shipping-for-sameday' );
@@ -235,7 +235,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 				return;
 			}
 			foreach ( $fresh->get_shipping_methods() as $item ) {
-				if ( 'drushfs_speedy' !== $item->get_method_id() ) {
+				if ( 'drushfs_sameday' !== $item->get_method_id() ) {
 					continue;
 				}
 				if ( empty( $item->get_meta( 'missing_address' ) ) ) {
@@ -1129,7 +1129,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 
 			// If credentials are not provided, try to find them
 			if ( ! $username || ! $password ) {
-				$option_like = 'woocommerce_drushfs_speedy_%_settings';
+				$option_like = 'woocommerce_drushfs_sameday_%_settings';
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 				$rows = $wpdb->get_results(
 					$wpdb->prepare(
@@ -1906,7 +1906,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			$context = $ship_to_different ? 'shipping' : 'billing';
 
 			// Delivery Type
-			$delivery_type = sanitize_text_field( $merged['speedy_delivery_type'] ?? '' );
+			$delivery_type = sanitize_text_field( $merged['sameday_delivery_type'] ?? '' );
 			if ( empty( $delivery_type ) && WC()->session ) {
 				$delivery_type = WC()->session->get( 'drushfs_delivery_type', 'address' );
 			}
@@ -1915,7 +1915,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			}
 
 			// Office ID
-			$office_id = absint( $merged['speedy_office_id'] ?? 0 );
+			$office_id = absint( $merged['sameday_office_id'] ?? 0 );
 			// On the cart page, fall back to session (set by get_first_available_office).
 			// On checkout, do NOT fall back — the user must select an office explicitly.
 			if ( $office_id === 0 && WC()->session && ! $has_post_data ) {

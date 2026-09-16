@@ -41,7 +41,7 @@
     'use strict';
 
     $(document).ready(function() {
-        const speedyMethodId = params.method_id; // 'drushfs_speedy'
+        const speedyMethodId = params.method_id; // 'drushfs_sameday'
         let isSpeedyActive = false;
         
         // State persistence across AJAX updates.
@@ -142,7 +142,7 @@
         // Capture state BEFORE WC destroys the DOM
         $(document.body).on('update_checkout', function() {
             if (isSpeedyActive && !settingUp) {
-                const type = $('input[name="speedy_delivery_type"]:checked').val();
+                const type = $('input[name="sameday_delivery_type"]:checked').val();
                 if (type) lastDeliveryType = type;
                 
                 // Only capture office if the user explicitly selected one
@@ -375,11 +375,11 @@
          * @param {SpeedyOfficeData} officeData
          */
         function setOfficeInDropdown(officeData) {
-            const currentType = $('input[name="speedy_delivery_type"]:checked').val();
+            const currentType = $('input[name="sameday_delivery_type"]:checked').val();
             const mapType = (officeData.type === 'APT') ? 'automat' : 'office';
             
             if (currentType !== mapType) {
-                $('input[name="speedy_delivery_type"][value="' + mapType + '"]').prop('checked', true).trigger('change');
+                $('input[name="sameday_delivery_type"][value="' + mapType + '"]').prop('checked', true).trigger('change');
                 setTimeout(function() {
                     setOfficeValue(officeData);
                 }, 500);
@@ -392,7 +392,7 @@
          * @param {SpeedyOfficeData} officeData
          */
         function setOfficeValue(officeData) {
-            const $select = $('#speedy_office_id');
+            const $select = $('#sameday_office_id');
             const targetOfficeId = String(officeData.id);
 
             if ($select.length) {
@@ -699,8 +699,8 @@
 
             lastDeliveryType = 'address';
             lastOfficeId = '';
-            sessionStorage.removeItem('speedy_delivery_type');
-            sessionStorage.removeItem('speedy_office_id');
+            sessionStorage.removeItem('sameday_delivery_type');
+            sessionStorage.removeItem('sameday_office_id');
         }
 
         function reorderFieldsForSpeedy() {
@@ -926,17 +926,17 @@
 
             let radios = '<span class="woocommerce-input-wrapper" id="speedy-delivery-type-wrapper">';
             
-            radios += '<input type="radio" name="speedy_delivery_type" id="speedy_delivery_type_address" value="address" checked="checked" style="margin-left: 0;">' +
-                      '<label for="speedy_delivery_type_address" style="display: inline-block; margin-right: 15px; margin-left: 5px;">' + params.i18n.to_address + '</label>';
+            radios += '<input type="radio" name="sameday_delivery_type" id="sameday_delivery_type_address" value="address" checked="checked" style="margin-left: 0;">' +
+                      '<label for="sameday_delivery_type_address" style="display: inline-block; margin-right: 15px; margin-left: 5px;">' + params.i18n.to_address + '</label>';
 
             if (data.has_office) {
-                radios += '<input type="radio" name="speedy_delivery_type" id="speedy_delivery_type_office" value="office">' +
-                          '<label for="speedy_delivery_type_office" style="display: inline-block; margin-right: 15px; margin-left: 5px;">' + params.i18n.to_office + '</label>';
+                radios += '<input type="radio" name="sameday_delivery_type" id="sameday_delivery_type_office" value="office">' +
+                          '<label for="sameday_delivery_type_office" style="display: inline-block; margin-right: 15px; margin-left: 5px;">' + params.i18n.to_office + '</label>';
                 $('#' + currentContext + '_city_field').data('offices', data.offices || []);
             }
             if (data.has_automat) {
-                radios += '<input type="radio" name="speedy_delivery_type" id="speedy_delivery_type_automat" value="automat">' +
-                          '<label for="speedy_delivery_type_automat" style="display: inline-block; margin-left: 5px;">' + params.i18n.to_automat + '</label>';
+                radios += '<input type="radio" name="sameday_delivery_type" id="sameday_delivery_type_automat" value="automat">' +
+                          '<label for="sameday_delivery_type_automat" style="display: inline-block; margin-left: 5px;">' + params.i18n.to_automat + '</label>';
                 $('#' + currentContext + '_city_field').data('automats', data.automats || []);
             }
             radios += '</span>';
@@ -946,7 +946,7 @@
 
             $('#' + currentContext + '_city_field').after(radioHtml);
 
-            $('input[name="speedy_delivery_type"]').on('change', function() {
+            $('input[name="sameday_delivery_type"]').on('change', function() {
                 handleDeliveryTypeChange($(this).val());
                 // Delivery type changed → recalculate shipping
                 $(document.body).trigger('update_checkout');
@@ -954,7 +954,7 @@
             
             // Trigger initial state
             if (lastDeliveryType !== 'address') {
-                $('input[name="speedy_delivery_type"][value="' + lastDeliveryType + '"]').prop('checked', true);
+                $('input[name="sameday_delivery_type"][value="' + lastDeliveryType + '"]').prop('checked', true);
             }
             handleDeliveryTypeChange(lastDeliveryType);
         }
@@ -964,7 +964,7 @@
             $('#speedy-map-button-wrapper').remove();
             $('#speedy-service-field').remove();
 
-            sessionStorage.setItem('speedy_delivery_type', type);
+            sessionStorage.setItem('sameday_delivery_type', type);
             lastDeliveryType = type;
             
             const $address1Field = $('#' + currentContext + '_address_1_field');
@@ -1009,14 +1009,14 @@
             });
 
             const selectHtml = '<p class="form-row form-row-wide" id="speedy-office-field">' +
-                '<label for="speedy_office_id">' + label + '&nbsp;<abbr class="required" title="required">*</abbr></label>' +
+                '<label for="sameday_office_id">' + label + '&nbsp;<abbr class="required" title="required">*</abbr></label>' +
                 '<span class="woocommerce-input-wrapper">' +
-                '<select name="speedy_office_id" id="speedy_office_id">' + options + '</select>' +
+                '<select name="sameday_office_id" id="sameday_office_id">' + options + '</select>' +
                 '</span></p>';
 
             $('#speedy-delivery-type-field').after(selectHtml);
             
-            const $officeSelect = $('#speedy_office_id');
+            const $officeSelect = $('#sameday_office_id');
             $officeSelect.select2({
                 width: '100%',
                 placeholder: label + '...',
@@ -1036,7 +1036,7 @@
             $officeSelect.on('change', function() {
                 const officeVal = $(this).val();
                 const selectedText = $(this).find('option:selected').text();
-                const deliveryType = $('input[name="speedy_delivery_type"]:checked').val();
+                const deliveryType = $('input[name="sameday_delivery_type"]:checked').val();
                 
                 const $address1Field = $('#' + currentContext + '_address_1_field');
                 const $address2Field = $('#' + currentContext + '_address_2_field');
@@ -1050,7 +1050,7 @@
                 $address2Field.find('input').val(officeVal ? selectedText : '');
 
                 lastOfficeId = officeVal || '';
-                sessionStorage.setItem('speedy_office_id', lastOfficeId);
+                sessionStorage.setItem('sameday_office_id', lastOfficeId);
 
                 // Office/automat selected → recalculate shipping
                 $(document.body).trigger('update_checkout');
@@ -1169,7 +1169,7 @@
             }
             if (!window.DrushfsMap) return;
 
-            const currentType = $('input[name="speedy_delivery_type"]:checked').val() || 'office';
+            const currentType = $('input[name="sameday_delivery_type"]:checked').val() || 'office';
 
             // Coordinates are fetched HERE, on the click, not with the dropdown:
             // shipping the map payload alongside every city change made Sofia's
@@ -1186,7 +1186,7 @@
 
                 window.DrushfsMap.open(points, function(point) {
                     const targetType = (point.office_type === 'APS') ? 'automat' : 'office';
-                    const $radio = $('input[name="speedy_delivery_type"][value="' + targetType + '"]');
+                    const $radio = $('input[name="sameday_delivery_type"][value="' + targetType + '"]');
                     if ($radio.length && !$radio.prop('checked')) {
                         $radio.prop('checked', true).trigger('change');
                     }
@@ -1194,7 +1194,7 @@
                     // briefly until the picked option exists, then commit it.
                     let tries = 0;
                     (function commit() {
-                        const $sel = $('#speedy_office_id');
+                        const $sel = $('#sameday_office_id');
                         if ($sel.length && $sel.find('option[value="' + point.id + '"]').length) {
                             $sel.val(String(point.id)).trigger('change');
                             return;
@@ -1325,7 +1325,7 @@
             $(document.body).on('input', '#billing_address_1, #shipping_address_1', function() {
                 if (!isSpeedyActive) return;
 
-                const deliveryType = $('input[name="speedy_delivery_type"]:checked').val();
+                const deliveryType = $('input[name="sameday_delivery_type"]:checked').val();
                 if (deliveryType !== 'address') return;
 
                 const query = $(this).val();

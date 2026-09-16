@@ -114,7 +114,7 @@ function drushfs_activate(): void {
  * @return bool
  */
 function drushfs_has_credentials(): bool {
-	$settings = get_option( 'woocommerce_drushfs_speedy_settings' );
+	$settings = get_option( 'woocommerce_drushfs_sameday_settings' );
 	if ( ! empty( $settings['speedy_username'] ) && ! empty( $settings['speedy_password'] ) ) {
 		return true;
 	}
@@ -123,7 +123,7 @@ function drushfs_has_credentials(): bool {
 	$rows = $wpdb->get_results(
 		$wpdb->prepare(
 			"SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
-			'woocommerce_drushfs_speedy_%_settings'
+			'woocommerce_drushfs_sameday_%_settings'
 		)
 	);
 	foreach ( (array) $rows as $row ) {
@@ -211,7 +211,7 @@ function drushfs_init(): void {
  */
 add_filter( 'woocommerce_shipping_methods', 'drushfs_register_method' );
 function drushfs_register_method( $methods ) {
-	$methods['drushfs_speedy'] = 'Drushfs_Shipping_Method';
+	$methods['drushfs_sameday'] = 'Drushfs_Shipping_Method';
 	return $methods;
 }
 
@@ -303,8 +303,8 @@ function drushfs_vary_package_hash( $packages ) {
 	// phpcs:ignore WordPress.Security.NonceVerification.Missing
 	$merged = array_merge( $post_data, $_POST );
 
-	$delivery_type = sanitize_text_field( $merged['speedy_delivery_type'] ?? 'address' );
-	$office_id     = absint( $merged['speedy_office_id'] ?? 0 );
+	$delivery_type = sanitize_text_field( $merged['sameday_delivery_type'] ?? 'address' );
+	$office_id     = absint( $merged['sameday_office_id'] ?? 0 );
 	$selected      = WC()->session ? WC()->session->get( 'drushfs_selected_service', 0 ) : 0;
 
 	// Determine which address context is active
@@ -317,7 +317,7 @@ function drushfs_vary_package_hash( $packages ) {
 		$city_id = absint( $merged['calc_shipping_city'] ?? 0 );
 	}
 	if ( ! $city_id ) {
-		$city_id = absint( $merged['speedy_city_id'] ?? 0 );
+		$city_id = absint( $merged['sameday_city_id'] ?? 0 );
 	}
 
 	// On the cart page, set session data directly from the form submission
@@ -367,9 +367,9 @@ function drushfs_vary_package_hash( $packages ) {
 
 	foreach ( $packages as &$package ) {
 		$package['speedy_selected_service'] = $selected;
-		$package['speedy_delivery_type']    = $delivery_type;
-		$package['speedy_office_id']        = $office_id;
-		$package['speedy_city_id']          = $city_id;
+		$package['sameday_delivery_type']    = $delivery_type;
+		$package['sameday_office_id']        = $office_id;
+		$package['sameday_city_id']          = $city_id;
 		$package['speedy_payment_method']   = $payment_method;
 	}
 
@@ -398,7 +398,7 @@ function drushfs_clear_speedy_when_unselected( $post_data = '' ): void {
 	}
 
 	foreach ( $shipping_methods as $method_id ) {
-		if ( str_starts_with( $method_id, 'drushfs_speedy' ) ) {
+		if ( str_starts_with( $method_id, 'drushfs_sameday' ) ) {
 			return;
 		}
 	}
@@ -444,7 +444,7 @@ function drushfs_clear_speedy_checkout_session(): void {
  */
 add_filter( 'woocommerce_cart_shipping_method_full_label', 'drushfs_hide_incomplete_price', 10, 2 );
 function drushfs_hide_incomplete_price( $label, $method ) {
-	if (str_starts_with($method->id, 'drushfs_speedy')) {
+	if (str_starts_with($method->id, 'drushfs_sameday')) {
 		$meta = $method->get_meta_data();
 		if ( ! empty( $meta['missing_address'] ) ) {
 			// Return just the method label without the price
@@ -485,7 +485,7 @@ function drushfs_enqueue_scripts(): void {
 	$params = array(
 		'ajax_url'           => admin_url( 'admin-ajax.php' ),
 		'nonce'              => wp_create_nonce( 'drushfs_public' ),
-		'method_id'          => 'drushfs_speedy',
+		'method_id'          => 'drushfs_sameday',
 		'current_type'       => $current_type,
 		'current_city_id'    => $current_city_id,
 		'current_state'      => $current_state,
@@ -599,8 +599,8 @@ add_action( 'woocommerce_cart_contents', 'drushfs_cart_hidden_fields' );
 function drushfs_cart_hidden_fields(): void {
 	$delivery_type = WC()->session ? WC()->session->get( 'drushfs_delivery_type', 'address' ) : 'address';
 	$city_id       = WC()->session ? absint( WC()->session->get( 'drushfs_city_id', 0 ) ) : 0;
-	echo '<input type="hidden" name="speedy_delivery_type" id="speedy_cart_delivery_type" value="' . esc_attr( $delivery_type ) . '">';
-	echo '<input type="hidden" name="speedy_city_id" id="speedy_cart_city_id" value="' . esc_attr( $city_id ) . '">';
+	echo '<input type="hidden" name="sameday_delivery_type" id="speedy_cart_delivery_type" value="' . esc_attr( $delivery_type ) . '">';
+	echo '<input type="hidden" name="sameday_city_id" id="speedy_cart_city_id" value="' . esc_attr( $city_id ) . '">';
 }
 
 /**
@@ -609,7 +609,7 @@ function drushfs_cart_hidden_fields(): void {
  */
 add_action( 'woocommerce_after_shipping_rate', 'drushfs_output_availability_data', 10, 2 );
 function drushfs_output_availability_data( $method ): void {
-	if (!str_starts_with($method->id, 'drushfs_speedy')) {
+	if (!str_starts_with($method->id, 'drushfs_sameday')) {
 		return;
 	}
 
@@ -1028,7 +1028,7 @@ function drushfs_upload_file(): void {
  */
 function drushfs_get_first_credentials(): ?array {
 	global $wpdb;
-	$option_like = 'woocommerce_drushfs_speedy_%_settings';
+	$option_like = 'woocommerce_drushfs_sameday_%_settings';
 	
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 	$rows = $wpdb->get_results(
@@ -1117,7 +1117,7 @@ function drushfs_admin_pickup_selector( $order ): void {
 	}
 	$shipping_methods = $order->get_shipping_methods();
 	$shipping_method  = reset( $shipping_methods );
-	if ( ! $shipping_method || 'drushfs_speedy' !== $shipping_method->get_method_id() ) {
+	if ( ! $shipping_method || 'drushfs_sameday' !== $shipping_method->get_method_id() ) {
 		return;
 	}
 	if ( $order->get_meta( '_drushfs_waybill_id' ) ) {
@@ -1581,17 +1581,17 @@ function drushfs_validate_checkout(): void {
 	$chosen_methods = WC()->session->get( 'chosen_shipping_methods' );
 	$chosen_shipping = $chosen_methods[0] ?? '';
 
-	if ( ! str_contains( $chosen_shipping, 'drushfs_speedy' ) ) {
+	if ( ! str_contains( $chosen_shipping, 'drushfs_sameday' ) ) {
 		return;
 	}
 
 	// Check delivery type
 	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce in woocommerce_checkout_process.
-	$delivery_type = isset( $_POST['speedy_delivery_type'] ) ? sanitize_text_field( wp_unslash( $_POST['speedy_delivery_type'] ) ) : 'address';
+	$delivery_type = isset( $_POST['sameday_delivery_type'] ) ? sanitize_text_field( wp_unslash( $_POST['sameday_delivery_type'] ) ) : 'address';
 
 	if ( 'office' === $delivery_type || 'automat' === $delivery_type ) {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce in woocommerce_checkout_process.
-		$office_id = isset( $_POST['speedy_office_id'] ) ? sanitize_text_field( wp_unslash( $_POST['speedy_office_id'] ) ) : '';
+		$office_id = isset( $_POST['sameday_office_id'] ) ? sanitize_text_field( wp_unslash( $_POST['sameday_office_id'] ) ) : '';
 
 		if ( empty( $office_id ) ) {
 			$error_msg = ( 'office' === $delivery_type ) 
@@ -1688,16 +1688,16 @@ function drushfs_save_order_meta( $order_id ): void {
 	}
 	$changed = false;
 	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout.
-	if ( ! empty( $_POST['speedy_delivery_type'] ) ) {
+	if ( ! empty( $_POST['sameday_delivery_type'] ) ) {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$order->update_meta_data( '_drushfs_delivery_type', sanitize_text_field( wp_unslash( $_POST['speedy_delivery_type'] ) ) );
+		$order->update_meta_data( '_drushfs_delivery_type', sanitize_text_field( wp_unslash( $_POST['sameday_delivery_type'] ) ) );
 		$changed = true;
 	}
 
 	// phpcs:ignore WordPress.Security.NonceVerification.Missing
-	if ( ! empty( $_POST['speedy_office_id'] ) ) {
+	if ( ! empty( $_POST['sameday_office_id'] ) ) {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$order->update_meta_data( '_drushfs_office_id', sanitize_text_field( wp_unslash( $_POST['speedy_office_id'] ) ) );
+		$order->update_meta_data( '_drushfs_office_id', sanitize_text_field( wp_unslash( $_POST['sameday_office_id'] ) ) );
 		$changed = true;
 	}
 	if ( $changed ) {

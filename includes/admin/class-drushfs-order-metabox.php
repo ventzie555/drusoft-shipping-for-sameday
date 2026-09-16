@@ -35,7 +35,7 @@ class Drushfs_Order_Metabox {
 
 		$has_speedy = false;
 		foreach ( $order->get_shipping_methods() as $method ) {
-			if ( 'drushfs_speedy' === $method->get_method_id() ) {
+			if ( 'drushfs_sameday' === $method->get_method_id() ) {
 				$has_speedy = true;
 				break;
 			}

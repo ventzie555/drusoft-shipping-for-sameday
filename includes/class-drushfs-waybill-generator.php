@@ -44,12 +44,12 @@ if ( ! class_exists( 'Drushfs_Waybill_Generator' ) ) {
 			$shipping_methods = $order->get_shipping_methods();
 			$shipping_method  = reset( $shipping_methods ); // Get the first shipping method
 
-			if ( ! $shipping_method || 'drushfs_speedy' !== $shipping_method->get_method_id() ) {
+			if ( ! $shipping_method || 'drushfs_sameday' !== $shipping_method->get_method_id() ) {
 				return;
 			}
 
 			$instance_id = $shipping_method->get_instance_id();
-			$settings    = get_option( 'woocommerce_drushfs_speedy_' . $instance_id . '_settings' );
+			$settings    = get_option( 'woocommerce_drushfs_sameday_' . $instance_id . '_settings' );
 
 			// Trigger on 'processing' or 'on-hold' if auto-generation is enabled
 			$should_generate = ( 'yes' === ( $settings['generate_waybill'] ?? 'no' ) );
@@ -88,7 +88,7 @@ if ( ! class_exists( 'Drushfs_Waybill_Generator' ) ) {
 			$shipping_methods = $order->get_shipping_methods();
 			$shipping_method  = reset( $shipping_methods );
 			$instance_id      = $shipping_method->get_instance_id();
-			$settings         = get_option( 'woocommerce_drushfs_speedy_' . $instance_id . '_settings' );
+			$settings         = get_option( 'woocommerce_drushfs_sameday_' . $instance_id . '_settings' );
 
 			$username = $settings['speedy_username'] ?? '';
 			$password = $settings['speedy_password'] ?? '';

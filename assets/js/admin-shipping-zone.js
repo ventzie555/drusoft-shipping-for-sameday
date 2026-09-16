@@ -43,10 +43,10 @@
 			return;
 		}
 
-		// Check if any of the saved methods is our drushfs_speedy method
+		// Check if any of the saved methods is our drushfs_sameday method
 		var isSpeedyMethod = false;
 		$.each( response.data.methods, function( id, method ) {
-			if ( method.id === 'drushfs_speedy' ) {
+			if ( method.id === 'drushfs_sameday' ) {
 				isSpeedyMethod = true;
 				return false; // break
 			}

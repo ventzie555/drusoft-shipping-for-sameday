@@ -373,7 +373,7 @@
 
         // Trigger the cart update directly — no separate AJAX needed.
         // The hidden fields + calc_shipping_city get submitted with the form.
-        // drushfs_speedy_vary_package_hash sets the session, then
+        // drushfs_sameday_vary_package_hash sets the session, then
         // calculate_shipping reads from session + POST data.
         isUpdating = true;
         cartUpdatePending = true;

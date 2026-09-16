@@ -299,9 +299,9 @@ class Drushfs_Actions {
 	 */
 	private static function get_settings_for_order( $order ): ?array {
 		foreach ( $order->get_shipping_methods() as $shipping_method ) {
-			if ( 'drushfs_speedy' === $shipping_method->get_method_id() ) {
+			if ( 'drushfs_sameday' === $shipping_method->get_method_id() ) {
 				$instance_id = $shipping_method->get_instance_id();
-				$settings = get_option( 'woocommerce_drushfs_speedy_' . $instance_id . '_settings' );
+				$settings = get_option( 'woocommerce_drushfs_sameday_' . $instance_id . '_settings' );
 				if ( is_array( $settings ) ) {
 					return $settings;
 				}
