@@ -14,8 +14,8 @@ class Drushfs_Admin_Menu {
 	public static function add_menu_page(): void {
 		add_submenu_page(
 			'woocommerce',
-			__( 'Speedy Orders', 'drusoft-shipping-for-sameday' ),
-			__( 'Speedy Orders', 'drusoft-shipping-for-sameday' ),
+			__( 'Sameday Orders', 'drusoft-shipping-for-sameday' ),
+			__( 'Sameday Orders', 'drusoft-shipping-for-sameday' ),
 			'manage_woocommerce',
 			'drushfs-orders',
 			[ __CLASS__, 'render_page' ]
@@ -56,7 +56,7 @@ class Drushfs_Admin_Menu {
 		$table->prepare_items();
 
 		echo '<div class="wrap">';
-		echo '<h1 class="wp-heading-inline">' . esc_html__( 'Speedy Orders', 'drusoft-shipping-for-sameday' ) . '</h1>';
+		echo '<h1 class="wp-heading-inline">' . esc_html__( 'Sameday Orders', 'drusoft-shipping-for-sameday' ) . '</h1>';
 		echo '<form method="post">';
 		$table->display();
 		echo '</form>';

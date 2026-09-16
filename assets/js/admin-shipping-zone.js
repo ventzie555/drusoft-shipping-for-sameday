@@ -1,5 +1,5 @@
 /**
- * Drusoft Shipping for Speedy – Admin Shipping Zone Script
+ * Drusoft Shipping for Sameday – Admin Shipping Zone Script
  *
  * Automatically reopens the shipping method settings modal after saving
  * credentials for the first time (so unlocked fields appear), or after
@@ -31,7 +31,7 @@
 			return;
 		}
 
-		// Parse the response to check if this was for our Speedy method
+		// Parse the response to check if this was for our Sameday method
 		var response;
 		try {
 			response = JSON.parse( xhr.responseText || '{}' );
@@ -44,15 +44,15 @@
 		}
 
 		// Check if any of the saved methods is our drushfs_sameday method
-		var isSpeedyMethod = false;
+		var isSamedayMethod = false;
 		$.each( response.data.methods, function( id, method ) {
 			if ( method.id === 'drushfs_sameday' ) {
-				isSpeedyMethod = true;
+				isSamedayMethod = true;
 				return false; // break
 			}
 		});
 
-		if ( ! isSpeedyMethod ) {
+		if ( ! isSamedayMethod ) {
 			return;
 		}
 
@@ -90,7 +90,7 @@
 				var $row  = $( this );
 				var $link = $row.find( 'a.wc-shipping-zone-method-settings' );
 
-				if ( $link.length && $row.text().indexOf( 'Speedy' ) !== -1 ) {
+				if ( $link.length && $row.text().indexOf( 'Sameday' ) !== -1 ) {
 					$link.trigger( 'click' );
 					return false;
 				}
@@ -112,7 +112,7 @@
 		}
 
 		// Build error HTML as a simple div (the modal uses divs, not tables)
-		var errorHtml = '<div class="speedy-auth-error" style="padding:2px 10px 12px;">';
+		var errorHtml = '<div class="sameday-auth-error" style="padding:2px 10px 12px;">';
 		$.each( pendingErrors, function( i, msg ) {
 			errorHtml += '<p style="color:#d63638;font-weight:bold;margin:4px 0;">' + msg + '</p>';
 		});
@@ -121,14 +121,14 @@
 
 		// The modal content structure after WC's replaceHTMLTables:
 		// <div class="wc-shipping-zone-method-fields">
-		//   <tr>...<input id="...speedy_password">...</tr>
+		//   <tr>...<input id="...sameday_password">...</tr>
 		//   ...
 		// In modern WC, fields may be rendered as fieldsets/labels instead of tr/td.
 		// Try multiple selectors to find the password field.
 		var $modal     = $( '.wc-backbone-modal-content' );
-		var $passField = $modal.find( '[id$="speedy_password"]' );
+		var $passField = $modal.find( '[id$="sameday_password"]' );
 
-		var $userField = $modal.find( '[id$="speedy_username"]' );
+		var $userField = $modal.find( '[id$="sameday_username"]' );
 
 		if ( $passField.length ) {
 			// Walk up to the nearest field wrapper (fieldset, tr, label, .form-field)
@@ -149,7 +149,7 @@
 		$passField.css( 'border', errorBorder );
 
 		// Highlight Username and Password labels in red
-		$modal.find( 'label[for$="speedy_username"], label[for$="speedy_password"]' )
+		$modal.find( 'label[for$="sameday_username"], label[for$="sameday_password"]' )
 			.css( 'color', '#d63638' );
 
 		// Clear pending errors so they don't show again on the next modal open

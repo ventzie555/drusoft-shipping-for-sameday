@@ -11,8 +11,8 @@ if ( ! class_exists( 'WP_List_Table' ) ) {
 /**
  * Class Drushfs_Orders_List_Table
  *
- * Extends WP_List_Table to display a list of WooCommerce orders that have an associated Speedy waybill.
- * Provides functionality for listing, pagination, and actions like printing waybills, canceling shipments, and requesting couriers.
+ * Extends WP_List_Table to display a list of WooCommerce orders that have an associated Sameday waybill.
+ * Provides functionality for listing, pagination, and actions like printing waybills, canceling shipments.
  */
 class Drushfs_Orders_List_Table extends WP_List_Table {
 
@@ -23,8 +23,8 @@ class Drushfs_Orders_List_Table extends WP_List_Table {
 	 */
 	public function __construct() {
 		parent::__construct( [
-			'singular' => __( 'Speedy Order', 'drusoft-shipping-for-sameday' ),
-			'plural'   => __( 'Speedy Orders', 'drusoft-shipping-for-sameday' ),
+			'singular' => __( 'Sameday Order', 'drusoft-shipping-for-sameday' ),
+			'plural'   => __( 'Sameday Orders', 'drusoft-shipping-for-sameday' ),
 			'ajax'     => false,
 		] );
 	}
@@ -48,7 +48,7 @@ class Drushfs_Orders_List_Table extends WP_List_Table {
 	/**
 	 * Prepare the items for the table to process.
 	 *
-	 * Fetches all orders that used Speedy shipping, handling pagination and sorting.
+	 * Fetches all orders that carry a Sameday waybill, handling pagination and sorting.
 	 * Orders without a waybill yet will show a "Generate" button.
 	 *
 	 * @return void
@@ -64,7 +64,7 @@ class Drushfs_Orders_List_Table extends WP_List_Table {
 			'paged'        => $paged,
 			'orderby'      => 'date',
 			'order'        => 'DESC',
-			'meta_key'     => '_drushfs_order_data', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Required to filter Speedy orders.
+			'meta_key'     => '_drushfs_waybill_id', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Required to filter Sameday orders.
 			'meta_compare' => 'EXISTS',
 			'paginate'     => true, // Required to get total count
 		];
@@ -117,7 +117,7 @@ class Drushfs_Orders_List_Table extends WP_List_Table {
 	/**
 	 * Render the Waybill column.
 	 *
-	 * Displays the waybill ID (linked to tracking) and action buttons (Print, Cancel, Request Courier).
+	 * Displays the waybill ID (linked to tracking) and action buttons (Print, Cancel).
 	 *
 	 * @param WC_Order $item The order object.
 	 *
@@ -127,7 +127,7 @@ class Drushfs_Orders_List_Table extends WP_List_Table {
 		$waybill_id = $item->get_meta( '_drushfs_waybill_id' );
 
 		if ( ! $waybill_id ) {
-			return '<button class="button speedy-generate-waybill" data-order-id="' . esc_attr( $item->get_id() ) . '">' . esc_html__( 'Generate', 'drusoft-shipping-for-sameday' ) . '</button>';
+			return '<button class="button sameday-generate-waybill" data-order-id="' . esc_attr( $item->get_id() ) . '">' . esc_html__( 'Generate', 'drusoft-shipping-for-sameday' ) . '</button>';
 		}
 
 		$print_url = wp_nonce_url(
@@ -137,17 +137,11 @@ class Drushfs_Orders_List_Table extends WP_List_Table {
 
 		$actions = [
 			'print'   => sprintf( '<a href="%s" target="_blank">%s</a>', esc_url( $print_url ), esc_html__( 'Print', 'drusoft-shipping-for-sameday' ) ),
-			'cancel'  => sprintf( '<a href="#" class="speedy-cancel-shipment" data-order-id="%d">%s</a>', esc_attr( $item->get_id() ), esc_html__( 'Cancel', 'drusoft-shipping-for-sameday' ) ),
+			'cancel'  => sprintf( '<a href="#" class="sameday-cancel-shipment" data-order-id="%d">%s</a>', esc_attr( $item->get_id() ), esc_html__( 'Cancel', 'drusoft-shipping-for-sameday' ) ),
 		];
 
-		$courier_requested = $item->get_meta( '_drushfs_courier_requested' );
-		if ( 'yes' === $courier_requested ) {
-			$actions['courier'] = '<span style="color: green;">' . esc_html__( 'Requested', 'drusoft-shipping-for-sameday' ) . '</span>';
-		} else {
-			$actions['courier'] = sprintf( '<a href="#" class="speedy-request-courier" data-order-id="%d">%s</a>', esc_attr( $item->get_id() ), esc_html__( 'Request Courier', 'drusoft-shipping-for-sameday' ) );
-		}
 
-		$track_url    = 'https://www.speedy.bg/track?id=' . urlencode( $waybill_id );
+		$track_url    = 'https://sameday.bg/awb-tracking/?awb=' . rawurlencode( $waybill_id );
 		$waybill_link = sprintf( '<a href="%s" target="_blank">%s</a>', esc_url( $track_url ), esc_html( $waybill_id ) );
 
 		return $waybill_link . $this->row_actions( $actions );

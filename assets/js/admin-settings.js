@@ -1,5 +1,5 @@
 /**
- * Drusoft Shipping for Speedy – Admin Settings Script
+ * Drusoft Shipping for Sameday – Admin Settings Script
  *
  * Handles dynamic field visibility and grouping in the shipping method settings modal.
  */
@@ -67,7 +67,7 @@
 			if ( ! $triggerField.length ) return;
 
 			// Check if already grouped to prevent errors or double wrapping
-			if ( $triggerField.closest('.speedy-settings-group').length ) {
+			if ( $triggerField.closest('.sameday-settings-group').length ) {
 				return;
 			}
 
@@ -93,100 +93,12 @@
 
 			// Wrap all collected elements in a single container
 			// wrapAll inserts the wrapper at the position of the first element in the set
-			$elementsToGroup.wrapAll('<div class="speedy-settings-group"></div>');
+			$elementsToGroup.wrapAll('<div class="sameday-settings-group"></div>');
 		}
 
-		/**
-		 * Transforms a text input into a file upload UI.
-		 */
-		function setupFileUpload( inputClass ) {
-			// Find the input directly by class
-			var $textInput = $( 'input.' + inputClass );
-			
-			// Filter for modal context
-			if ( $textInput.length > 1 ) {
-				$textInput = $textInput.filter(function() {
-					return $(this).closest('.wc-backbone-modal-content').length > 0;
-				});
-			}
 
-			if ( ! $textInput.length ) return;
-
-			var savedPath = $textInput.val();
-			var fieldName = $textInput.attr('name');
-
-			// Hide the original text input
-			$textInput.hide();
-
-			// Create the UI
-			var uiHtml = '<div class="speedy-file-ui">';
-			
-			// Status/Info area
-			uiHtml += '<div class="speedy-file-info">';
-			if ( savedPath ) {
-				var fileName = savedPath.split(/[\\/]/).pop();
-				uiHtml += '<p class="description" style="margin-top: 5px;"><strong>' + 'Current file:' + '</strong> ' + fileName + '</p>';
-			}
-			uiHtml += '</div>';
-
-			// File input (using a different name to avoid confusion with the text input)
-			uiHtml += '<input type="file" class="speedy-file-upload-input" style="margin-top: 5px;">';
-			uiHtml += '<span class="spinner" style="float: none; margin-left: 5px;"></span>';
-			uiHtml += '<div class="speedy-upload-error" style="color: red; margin-top: 5px;"></div>';
-			
-			uiHtml += '</div>';
-
-			var $ui = $(uiHtml);
-			$textInput.after($ui);
-
-			// Handle file selection
-			$ui.find('.speedy-file-upload-input').on('change', function(e) {
-				var file = this.files[0];
-				if ( ! file ) return;
-
-				var $spinner = $ui.find('.spinner');
-				var $error   = $ui.find('.speedy-upload-error');
-				var $info    = $ui.find('.speedy-file-info');
-
-				$spinner.addClass('is-active');
-				$error.text('');
-
-				var formData = new FormData();
-				formData.append('action', 'drushfs_upload_file');
-				formData.append('nonce', drushfs_admin.nonce);
-				formData.append('file', file);
-
-				$.ajax({
-					url: ajaxurl,
-					type: 'POST',
-					data: formData,
-					contentType: false,
-					processData: false,
-					success: function( response ) {
-						$spinner.removeClass('is-active');
-						if ( response.success ) {
-							// Update the hidden text input with the new path
-							$textInput.val( response.data.path ).trigger('change');
-							
-							// Update UI
-							$info.html('<p class="description" style="margin-top: 5px; color: green;"><strong>' + 'Uploaded:' + '</strong> ' + response.data.name + '</p>');
-						} else {
-							$error.text( response.data );
-						}
-					},
-					error: function() {
-						$spinner.removeClass('is-active');
-						$error.text( 'Upload failed. Please try again.' );
-					}
-				});
-			});
-		}
 
 		// --- Grouping Logic ---
-		createVisualGroup( 'woocommerce_drushfs_sameday_free_shipping', ['free_shipping_automat', 'free_shipping_office', 'free_shipping_address'] );
-		createVisualGroup( 'woocommerce_drushfs_sameday_fixed_shipping', ['fixed_shipping_automat', 'fixed_shipping_office', 'fixed_shipping_address'] );
-		createVisualGroup( 'woocommerce_drushfs_sameday_vaucher', ['vaucherpayer', 'vaucherpayerdays'] );
-		createVisualGroup( 'woocommerce_drushfs_sameday_test_before_pay', ['testplatec', 'autoclose'] );
 
 
 		// --- Visibility Logic ---
@@ -271,14 +183,7 @@
 					$fixedCheckbox.prop( 'checked', false ).trigger( 'change' );
 				}
 			} 
-			else if ( method === 'speedycalculator' || method === 'nadbavka' || method === 'fileprices' ) {
-				if ( $fixedCheckbox.is(':checked') ) {
-					$fixedCheckbox.prop( 'checked', false ).trigger( 'change' );
-				}
-				if ( $freeCheckbox.is(':checked') ) {
-					$freeCheckbox.prop( 'checked', false ).trigger( 'change' );
-				}
-			}
+			
 		}
 
 		if ( $pricingSelect.length ) {
@@ -288,17 +193,9 @@
 			toggleRow( 'fileceni', initialMethod === 'fileprices' );
 		}
 
-		setupDependency( 'sender_officeyesno', 'sender_office', 'YES' );
-		setupDependency( 'obqvena', 'chuplivost', 'YES' );
-		setupDependency( 'vaucher', 'vaucherpayer', 'YES' );
-		setupDependency( 'vaucher', 'vaucherpayerdays', 'YES' );
-		setupDependency( 'test_before_pay', 'testplatec', ['OPEN', 'TEST'] );
-		setupDependency( 'test_before_pay', 'autoclose', ['OPEN', 'TEST'] );
 
-		// --- Init Special UI ---
-		setupFileUpload( 'speedy-file-input-wrapper' );
 
-		var $citySearch = $( '.speedy-city-search' );
+		var $citySearch = $( '.sameday-city-search' );
 		
 		// Filter for modal context to avoid duplicates
 		if ( $citySearch.length > 1 ) {
@@ -332,7 +229,7 @@
 			});
 		}
 
-		var $officeSearch = $( '.speedy-office-search' );
+		var $officeSearch = $( '.sameday-point-search' );
 		
 		// Filter for modal context to avoid duplicates
 		if ( $officeSearch.length > 1 ) {

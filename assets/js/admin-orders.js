@@ -2,10 +2,10 @@ jQuery(document).ready(function($) {
     // The nonce and ajaxurl are passed via wp_localize_script as 'drushfs_admin_params'
 
     function showNotice(message, type) {
-        // Remove any existing Speedy notices
-        $('.speedy-admin-notice').remove();
+        // Remove any existing notices of ours
+        $('.sameday-admin-notice').remove();
         var cssClass = (type === 'error') ? 'notice-error' : 'notice-success';
-        var notice = $('<div class="notice ' + cssClass + ' is-dismissible speedy-admin-notice"><p>' + message + '</p>' +
+        var notice = $('<div class="notice ' + cssClass + ' is-dismissible sameday-admin-notice"><p>' + message + '</p>' +
             '<button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss</span></button></div>');
         $('.wrap h1').first().after(notice);
         notice.find('.notice-dismiss').on('click', function() {
@@ -15,7 +15,7 @@ jQuery(document).ready(function($) {
         setTimeout(function() { notice.fadeOut(400, function() { $(this).remove(); }); }, 5000);
     }
 
-    $(document).on('click', '.speedy-cancel-shipment', function(e) {
+    $(document).on('click', '.sameday-cancel-shipment', function(e) {
         e.preventDefault();
         if (!confirm(drushfs_admin_params.i18n.confirm_cancel)) {
             return;
@@ -39,7 +39,7 @@ jQuery(document).ready(function($) {
                     // Replace waybill cell with a Generate button
                     var waybillCell = row.find('.column-waybill');
                     waybillCell.html(
-                        '<button class="button speedy-generate-waybill" data-order-id="' + orderId + '">' +
+                        '<button class="button sameday-generate-waybill" data-order-id="' + orderId + '">' +
                         drushfs_admin_params.i18n.generate +
                         '</button>'
                     );
@@ -53,35 +53,7 @@ jQuery(document).ready(function($) {
         });
     });
 
-    $(document).on('click', '.speedy-request-courier', function(e) {
-        e.preventDefault();
-        const orderId = $(this).data('order-id');
-        const button = $(this);
-
-        $.ajax({
-            url: drushfs_admin_params.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'drushfs_request_courier',
-                order_id: orderId,
-                nonce: drushfs_admin_params.nonce
-            },
-            beforeSend: function() {
-                button.text(drushfs_admin_params.i18n.requesting).prop('disabled', true);
-            },
-            success: function(response) {
-                if (response.success) {
-                    button.replaceWith('<span style="color: green;">' + drushfs_admin_params.i18n.requested + '</span>');
-                    showNotice(response.data, 'success');
-                } else {
-                    showNotice(response.data, 'error');
-                    button.text(drushfs_admin_params.i18n.request_courier).prop('disabled', false);
-                }
-            }
-        });
-    });
-
-    $(document).on('click', '.speedy-generate-waybill', function(e) {
+    $(document).on('click', '.sameday-generate-waybill', function(e) {
         e.preventDefault();
         const orderId = $(this).data('order-id');
         const button = $(this);

@@ -1,0 +1,373 @@
+/* global jQuery, L */
+/**
+ * Drusoft Shipping for Sameday — office/automat map module.
+ *
+ * Exposes window.DrushfsMap with one method: open(points, onSelect, opts).
+ *
+ *   points: Array<OfficePoint> — full list to plot; filters are applied
+ *           client-side based on user toggles.
+ *   onSelect: function(point): void — called when the user clicks "Select"
+ *             inside a marker popup.
+ *   opts: {
+ *     title?: string,
+ *     hint?: string,
+ *     pickLabel?: string,
+ *     errorLabel?: string,
+ *     i18n?: { offices?: string, automats?: string, both?: string,
+ *              search_placeholder?: string, search_no_results?: string },
+ *     defaultFilter?: 'office' | 'automat' | 'both',   // default 'both'
+ *   }
+ *
+ * @typedef {Object} OfficePoint
+ * @property {string|number} id
+ * @property {string}        name
+ * @property {string}        address
+ * @property {string}        [city_name]
+ * @property {string}        office_type   // 'APS' (automat) or 'OFFICE'
+ * @property {number}        lat
+ * @property {number}        lng
+ */
+
+(function ($) {
+    'use strict';
+
+    // Leaflet is bundled with the plugin (assets/vendor/leaflet/) and lazy-loaded
+    // from the local plugin directory on first map open — never from a CDN.
+    // These URLs are injected by wp_localize_script(); see drushfs_enqueue_scripts().
+    var CFG            = window.drushfs_map_cfg || {};
+    var LEAFLET_CSS    = CFG.leaflet_css || '';
+    var LEAFLET_JS     = CFG.leaflet_js || '';
+    var LEAFLET_IMAGES = CFG.leaflet_images || '';
+
+    var leafletPromise = null;
+    var $modal = null;
+    var mapInstance = null;
+    var markerLayer = null;
+    // Index from point.id → Leaflet marker, populated each renderMarkers().
+    // Used by the suggestions list to pan+open the popup for a picked row
+    // without re-creating the marker.
+    var markersById = {};
+
+    // Module-scoped state used by the filter handlers — populated in open().
+    var allPoints = [];
+    var currentFilterType = 'both';
+    var currentSearch = '';
+    var currentOnSelect = null;
+    var currentOpts = {};
+
+    /**
+     * Load Leaflet CSS + JS once, return a Promise that resolves when window.L
+     * is available.
+     */
+    // Point Leaflet's default marker icons at the bundled images/ dir so the
+    // markers/shadow load locally instead of via Leaflet's path-guessing.
+    function finish(resolve) {
+        if (window.L && LEAFLET_IMAGES) {
+            window.L.Icon.Default.imagePath = LEAFLET_IMAGES;
+        }
+        resolve(window.L);
+    }
+
+    function loadLeaflet() {
+        if (leafletPromise) return leafletPromise;
+        leafletPromise = new Promise(function (resolve, reject) {
+            if (!LEAFLET_JS || !LEAFLET_CSS) {
+                reject(new Error('Leaflet assets are not configured'));
+                return;
+            }
+            if (!document.querySelector('link[data-drushfs-leaflet]')) {
+                var link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = LEAFLET_CSS;
+                link.setAttribute('data-drushfs-leaflet', '1');
+                document.head.appendChild(link);
+            }
+            if (window.L) { finish(resolve); return; }
+            var existing = document.querySelector('script[data-drushfs-leaflet]');
+            if (existing) {
+                existing.addEventListener('load', function () { finish(resolve); });
+                existing.addEventListener('error', function () { reject(new Error('Leaflet failed to load')); });
+                return;
+            }
+            var script = document.createElement('script');
+            script.src = LEAFLET_JS;
+            script.async = true;
+            script.setAttribute('data-drushfs-leaflet', '1');
+            script.addEventListener('load', function () { finish(resolve); });
+            script.addEventListener('error', function () { reject(new Error('Leaflet failed to load')); });
+            document.head.appendChild(script);
+        });
+        return leafletPromise;
+    }
+
+    function ensureModal() {
+        if ($modal && $modal.length && document.body.contains($modal[0])) return $modal;
+
+        $modal = $(
+            '<div class="drushfs-map-modal" id="drushfs-map-modal" aria-hidden="true">' +
+                '<div class="drushfs-map-modal__content">' +
+                    '<button type="button" class="drushfs-map-modal__close" aria-label="Close">&times;</button>' +
+                    '<h3 class="drushfs-map-modal__title"></h3>' +
+                    '<div class="drushfs-map-modal__filters">' +
+                        '<div class="drushfs-map-modal__radios">' +
+                            '<label><input type="radio" name="drushfs-map-filter" value="office"> <span class="drushfs-map-modal__radio-label drushfs-map-modal__radio-label--office"></span></label>' +
+                            '<label><input type="radio" name="drushfs-map-filter" value="automat"> <span class="drushfs-map-modal__radio-label drushfs-map-modal__radio-label--automat"></span></label>' +
+                            '<label><input type="radio" name="drushfs-map-filter" value="both" checked> <span class="drushfs-map-modal__radio-label drushfs-map-modal__radio-label--both"></span></label>' +
+                        '</div>' +
+                        '<div class="drushfs-map-modal__search-wrap">' +
+                            '<input type="search" class="drushfs-map-modal__search" autocomplete="off" />' +
+                            '<ul class="drushfs-map-modal__suggestions" hidden></ul>' +
+                        '</div>' +
+                        '<span class="drushfs-map-modal__count"></span>' +
+                    '</div>' +
+                    '<div class="drushfs-map-modal__map" id="drushfs-map-canvas"></div>' +
+                    '<p class="drushfs-map-modal__hint"></p>' +
+                '</div>' +
+            '</div>'
+        );
+        $('body').append($modal);
+
+        $modal.on('click', '.drushfs-map-modal__close', closeModal);
+        $modal.on('click', function (e) {
+            if (e.target === $modal[0]) closeModal();
+        });
+        $(document).on('keydown.drushfsMap', function (e) {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Filter wiring (delegated on modal because content swaps).
+        $modal.on('change', 'input[name="drushfs-map-filter"]', function () {
+            currentFilterType = $(this).val();
+            renderMarkers();
+            renderSuggestions();
+        });
+        var searchDebounce = null;
+        $modal.on('input', '.drushfs-map-modal__search', function () {
+            var v = $(this).val();
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(function () {
+                currentSearch = (v || '').toString().trim().toLowerCase();
+                renderMarkers();
+                renderSuggestions();
+            }, 150);
+        });
+
+        // Click a suggestion → pan/zoom the map to the matching marker and
+        // open its popup. The user then confirms via the popup's "Select"
+        // button (same flow as clicking a marker directly). This keeps a
+        // single confirmation path and gives visual context before committing.
+        $modal.on('mousedown', '.drushfs-map-modal__suggestions li[data-pick-idx]', function (e) {
+            // mousedown (not click) — Safari fires blur on search before click,
+            // which would hide the list before the click registers.
+            e.preventDefault();
+            var idx = parseInt($(this).attr('data-pick-idx'), 10);
+            if (isNaN(idx)) return;
+            var p = lastSuggested[idx];
+            if (!p || !mapInstance || !isFinite(p.lat) || !isFinite(p.lng)) return;
+
+            // Hide the dropdown so the user can see the map clearly.
+            $modal.find('.drushfs-map-modal__suggestions').attr('hidden', true);
+            $modal.find('.drushfs-map-modal__search').trigger('blur');
+
+            // Pan + zoom; openPopup once the move animation completes (Leaflet
+            // doesn't open popups reliably mid-animation).
+            mapInstance.flyTo([p.lat, p.lng], Math.max(mapInstance.getZoom(), 15), { duration: 0.4 });
+            var marker = markersById[String(p.id)];
+            // Defer the popup open until after the fly animation.
+            setTimeout(function () {
+                if (marker) marker.openPopup();
+            }, 450);
+        });
+
+        // Hide suggestions on blur (with a tiny delay so the mousedown above can fire first).
+        $modal.on('blur', '.drushfs-map-modal__search', function () {
+            setTimeout(function () { $modal.find('.drushfs-map-modal__suggestions').attr('hidden', true); }, 150);
+        });
+        $modal.on('focus', '.drushfs-map-modal__search', function () {
+            if (currentSearch) renderSuggestions();
+        });
+
+        return $modal;
+    }
+
+    // Holds the last list rendered into the suggestions <ul> so click handlers
+    // can pick the right object by index without serialising the whole point
+    // into the data-attribute.
+    var lastSuggested = [];
+
+    function renderSuggestions() {
+        var $sug = $modal.find('.drushfs-map-modal__suggestions');
+        if (!currentSearch) {
+            lastSuggested = [];
+            $sug.empty().attr('hidden', true);
+            return;
+        }
+        var pts = applyFilters().slice(0, 12);
+        lastSuggested = pts;
+        if (!pts.length) {
+            $sug.html('<li class="drushfs-map-modal__suggestion-empty">' +
+                escapeHtml((currentOpts.i18n && currentOpts.i18n.search_no_results) || 'No matches') +
+                '</li>').removeAttr('hidden');
+            return;
+        }
+        var html = pts.map(function (p, i) {
+            var label = (p.office_type === 'APS') ? '📦 ' : '🏢 ';
+            return '<li data-pick-idx="' + i + '">' +
+                '<span class="drushfs-map-modal__sug-name">' + label + escapeHtml(p.name || '') + '</span>' +
+                (p.city_name ? ' <span class="drushfs-map-modal__sug-city">' + escapeHtml(p.city_name) + '</span>' : '') +
+                (p.address ? '<br/><span class="drushfs-map-modal__sug-addr">' + escapeHtml(p.address) + '</span>' : '') +
+                '</li>';
+        }).join('');
+        $sug.html(html).removeAttr('hidden');
+    }
+
+    function closeModal() {
+        if (!$modal) return;
+        $modal.removeClass('is-open').attr('aria-hidden', 'true');
+        if (mapInstance) { mapInstance.remove(); mapInstance = null; markerLayer = null; }
+    }
+
+    function applyFilters() {
+        // Build a transliterated version of the search term so a user typing
+        // Latin (e.g. "Sofia") matches Cyrillic content (e.g. "София").
+        // SamedayModern.transliterate is provided by common.js — fall back
+        // to identity if for some reason that's missing (defensive only).
+        var transliterate = (window.SamedayModern && typeof window.SamedayModern.transliterate === 'function')
+            ? window.SamedayModern.transliterate
+            : function (s) { return s; };
+        var altSearch = currentSearch ? transliterate(currentSearch).toLowerCase() : '';
+
+        return allPoints.filter(function (p) {
+            if (currentFilterType === 'office'  && p.office_type === 'APS') return false;
+            if (currentFilterType === 'automat' && p.office_type !== 'APS') return false;
+            if (currentSearch) {
+                var hay = ((p.name || '') + ' ' + (p.city_name || '') + ' ' + (p.address || '')).toLowerCase();
+                if (hay.indexOf(currentSearch) === -1 && (altSearch === currentSearch || hay.indexOf(altSearch) === -1)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+    }
+
+    /**
+     * Wipe the marker layer and rebuild it from the currently-filtered point
+     * set. Also re-fits the map bounds and updates the result-count label.
+     * Safe to call before Leaflet has loaded — it bails until mapInstance exists.
+     */
+    function renderMarkers() {
+        if (!mapInstance || !markerLayer || !window.L) return;
+        markerLayer.clearLayers();
+        markersById = {};
+
+        var pts = applyFilters();
+        var bounds = null;
+        pts.forEach(function (p) {
+            if (!isFinite(p.lat) || !isFinite(p.lng) || (p.lat === 0 && p.lng === 0)) return;
+            var marker = window.L.marker([p.lat, p.lng]).addTo(markerLayer);
+            markersById[String(p.id)] = marker;
+            var popup = window.L.DomUtil.create('div', 'drushfs-map-popup');
+            popup.innerHTML =
+                '<strong>' + escapeHtml(p.name || '') + '</strong>' +
+                (p.city_name ? '<br/><span class="drushfs-map-popup__city">' + escapeHtml(p.city_name) + '</span>' : '') +
+                (p.address ? '<br/><small>' + escapeHtml(p.address) + '</small>' : '') +
+                '<br/><button type="button" class="button button-primary drushfs-map-popup__pick" style="margin-top:6px;">' +
+                escapeHtml(currentOpts.pickLabel || 'Select') + '</button>';
+            marker.bindPopup(popup);
+            marker.on('popupopen', function (e) {
+                var btn = e.popup.getElement().querySelector('.drushfs-map-popup__pick');
+                if (!btn) return;
+                btn.addEventListener('click', function () {
+                    try { currentOnSelect && currentOnSelect(p); } catch (err) { console.error('[drushfs-map] onSelect error:', err); }
+                    closeModal();
+                }, { once: true });
+            });
+            bounds = bounds ? bounds.extend([p.lat, p.lng]) : window.L.latLngBounds([p.lat, p.lng], [p.lat, p.lng]);
+        });
+
+        // Update result count label.
+        var label = (currentOpts.i18n && currentOpts.i18n.results_count) || '{n} results';
+        $modal.find('.drushfs-map-modal__count').text(label.replace('{n}', pts.length));
+
+        if (bounds && bounds.isValid()) {
+            mapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+        } else {
+            // No matches → centre on Bulgaria.
+            mapInstance.setView([42.7339, 25.4858], 7);
+        }
+    }
+
+    function open(points, onSelect, opts) {
+        opts = opts || {};
+        currentOpts = opts;
+        currentOnSelect = onSelect;
+        allPoints = Array.isArray(points) ? points.slice() : [];
+        currentFilterType = opts.defaultFilter || 'both';
+        currentSearch = '';
+
+        ensureModal();
+        $modal.find('.drushfs-map-modal__title').text(opts.title || '');
+        $modal.find('.drushfs-map-modal__hint').text(opts.hint || '');
+
+        // Localise the filter labels.
+        var i18n = opts.i18n || {};
+        $modal.find('.drushfs-map-modal__radio-label--office').text(i18n.offices  || 'Offices');
+        $modal.find('.drushfs-map-modal__radio-label--automat').text(i18n.automats || 'Automats');
+        $modal.find('.drushfs-map-modal__radio-label--both').text(i18n.both || 'Both');
+        $modal.find('.drushfs-map-modal__search').attr('placeholder', i18n.search_placeholder || 'Search city, name…');
+
+        $modal.find('input[name="drushfs-map-filter"][value="' + currentFilterType + '"]').prop('checked', true);
+        $modal.find('.drushfs-map-modal__search').val('');
+        $modal.find('.drushfs-map-modal__suggestions').empty().attr('hidden', true);
+        lastSuggested = [];
+
+        $modal.addClass('is-open').attr('aria-hidden', 'false');
+
+        loadLeaflet().then(function (L) {
+            if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+
+            mapInstance = L.map('drushfs-map-canvas');
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            }).addTo(mapInstance);
+            markerLayer = L.layerGroup().addTo(mapInstance);
+
+            renderMarkers();
+
+            // Focus the view on the caller's city: renderMarkers() fits the FULL
+            // point set (nationwide for this courier), which zooms out to the whole
+            // country even though the customer already picked a city. The full set
+            // stays plotted so search/filters still reach everything — only the
+            // initial viewport narrows.
+            if (opts.focusCityId != null && String(opts.focusCityId) !== '') {
+                var focusPts = allPoints.filter(function (p) {
+                    return String(p.city_id) === String(opts.focusCityId)
+                        && isFinite(p.lat) && isFinite(p.lng) && !(p.lat === 0 && p.lng === 0);
+                });
+                if (focusPts.length) {
+                    var fb = null;
+                    focusPts.forEach(function (p) {
+                        fb = fb ? fb.extend([p.lat, p.lng]) : L.latLngBounds([p.lat, p.lng], [p.lat, p.lng]);
+                    });
+                    if (fb && fb.isValid()) mapInstance.fitBounds(fb, { padding: [40, 40], maxZoom: 16 });
+                }
+            }
+
+            // Leaflet needs invalidateSize when the container has just become visible.
+            setTimeout(function () { if (mapInstance) mapInstance.invalidateSize(); }, 50);
+        }).catch(function (err) {
+            $modal.find('.drushfs-map-modal__map').text(
+                (opts.errorLabel || 'Map could not be loaded:') + ' ' + (err && err.message ? err.message : err)
+            );
+        });
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+    }
+
+    window.DrushfsMap = { open: open, close: closeModal };
+})(jQuery);

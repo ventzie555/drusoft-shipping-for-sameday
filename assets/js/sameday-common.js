@@ -1,7 +1,7 @@
 /**
- * Drusoft Shipping for Speedy — Shared utilities
+ * Drusoft Shipping for Sameday — Shared utilities
  *
- * Exposes window.SpeedyModern with transliteration and Select2 matcher
+ * Exposes window.SamedayModern with transliteration and Select2 matcher
  * used by both cart.js and checkout.js.
  */
 (function ($) {
@@ -96,7 +96,7 @@
 
     /* ─── Expose public API ───────────────────────────────── */
 
-    window.SpeedyModern = {
+    window.SamedayModern = {
         transliterate:    transliterate,
         modelMatcher:     modelMatcher,
         sortStateOptions: sortStateOptions,

@@ -1,8 +1,8 @@
 /**
- * Drusoft Shipping for Speedy - Admin Settings Styles
+ * Drusoft Shipping for Sameday - Admin Settings Styles
  */
 
-.speedy-settings-group {
+.sameday-settings-group {
     border: 1px solid #ccc;
     padding: 15px;
     margin-bottom: 15px;
@@ -10,7 +10,7 @@
     border-radius: 4px;
 }
 
-.speedy-settings-group > label:first-of-type {
+.sameday-settings-group > label:first-of-type {
     font-weight: bold;
     color: #23282d;
     display: block;
@@ -19,11 +19,11 @@
 }
 
 /* Ensure fieldsets inside the group have some spacing */
-.speedy-settings-group fieldset {
+.sameday-settings-group fieldset {
     margin-bottom: 10px;
 }
 
 /* Hide the last margin */
-.speedy-settings-group fieldset:last-child {
+.sameday-settings-group fieldset:last-child {
     margin-bottom: 0;
 }

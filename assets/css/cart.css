@@ -1,10 +1,10 @@
 /**
- * Drusoft Shipping for Speedy — Cart page styles
+ * Drusoft Shipping for Sameday — Cart page styles
  */
 
 /* ─── Delivery-type selector ────────────────────────── */
 
-#speedy-cart-selector {
+#sameday-cart-selector {
 	display: none;
 	margin-top: 15px;
 	padding: 15px;
@@ -17,7 +17,7 @@
 	text-indent: 0;
 }
 
-#speedy-cart-selector .speedy-cart-heading {
+#sameday-cart-selector .sameday-cart-heading {
 	margin-bottom: 12px;
 	font-weight: 600;
 	font-size: 14px;
@@ -27,15 +27,15 @@
 	text-indent: 0;
 }
 
-#speedy-cart-options {
+#sameday-cart-options {
 	display: block;
 }
 
-.speedy-cart-option {
+.sameday-cart-option {
 	margin-bottom: 8px;
 }
 
-.speedy-cart-option label {
+.sameday-cart-option label {
 	cursor: pointer;
 	display: block !important;
 	font-size: 14px !important;
@@ -48,7 +48,7 @@
 	text-indent: 0 !important;
 }
 
-.speedy-cart-option input[type="radio"] {
+.sameday-cart-option input[type="radio"] {
 	margin: 0 10px 0 0 !important;
 	width: 18px !important;
 	height: 18px !important;
@@ -60,13 +60,13 @@
 	-webkit-appearance: radio !important;
 }
 
-.speedy-cart-option span {
+.sameday-cart-option span {
 	vertical-align: middle !important;
 	display: inline-block !important;
 }
 
 /* Fade effect while updating */
-#speedy-cart-selector.speedy-updating {
+#sameday-cart-selector.sameday-updating {
 	opacity: 0.6;
 	pointer-events: none;
 }

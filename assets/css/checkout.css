@@ -1,13 +1,13 @@
-/* Drusoft Shipping for Speedy Checkout Styles */
+/* Drusoft Shipping for Sameday Checkout Styles */
 
-/* Reduce font size ONLY for Speedy Office/Automat dropdowns */
-#speedy-office-field .select2-container .select2-selection--single {
+/* Reduce font size ONLY for the easybox / SAMEDAY point dropdown */
+#sameday-point-field .select2-container .select2-selection--single {
     height: 32px; /* Standard WC height is usually around 40px, reducing slightly */
     display: flex;
     align-items: center;
 }
 
-#speedy-office-field .select2-container--default .select2-selection--single .select2-selection__rendered {
+#sameday-point-field .select2-container--default .select2-selection--single .select2-selection__rendered {
     font-size: 13px; /* Smaller font for long addresses */
     line-height: 1.2; /* Allow multi-line if needed, or tight single line */
     padding-left: 8px;
@@ -20,7 +20,7 @@
 }
 
 /* Center the arrow vertically */
-#speedy-office-field .select2-container--default .select2-selection--single .select2-selection__arrow {
+#sameday-point-field .select2-container--default .select2-selection--single .select2-selection__arrow {
     height: 30px;
     top: 1px;
 }
@@ -31,127 +31,20 @@
     padding: 6px 10px;
 }
 
-/* Service Selector (radio buttons) */
-#speedy-service-field {
-    max-width: 100%;
-}
-
-#speedy-service-field .speedy-service-option {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: normal;
-    cursor: pointer;
-    font-size: 13px;
-    line-height: 1.4;
-}
-
-#speedy-service-field .speedy-service-option input[type="radio"] {
-    margin-right: 6px;
-    vertical-align: middle;
-}
-
 /* Ensure radio buttons are aligned nicely */
-#speedy-delivery-type-wrapper label {
+#sameday-delivery-type-field label {
     font-weight: normal;
     margin-right: 15px;
     cursor: pointer;
 }
 
-#speedy-delivery-type-wrapper input[type="radio"] {
+#sameday-delivery-type-field input[type="radio"] {
     margin-right: 5px;
     vertical-align: middle;
 }
 
-/* Speedy Map Modal */
-.speedy-modal {
-    display: none;
-    position: fixed;
-    z-index: 99999;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0,0,0,0.5);
-}
-
-.speedy-modal-content {
-    background-color: #fefefe;
-    margin: 5% auto;
-    padding: 0;
-    border: 1px solid #888;
-    width: 90%;
-    max-width: 1000px;
-    height: 80%;
-    position: relative;
-    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
-    border-radius: 5px;
-}
-
-.speedy-modal-header {
-    padding: 10px 15px;
-    background: #f1f1f1;
-    border-bottom: 1px solid #ddd;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-radius: 5px 5px 0 0;
-}
-
-.speedy-modal-title {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-}
-
-.speedy-close {
-    color: #aaa;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-    line-height: 20px;
-}
-
-.speedy-close:hover,
-.speedy-close:focus {
-    color: black;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.speedy-modal-body {
-    height: calc(100% - 41px); /* Header height approx */
-    width: 100%;
-}
-
-.speedy-modal-body iframe {
-    width: 100%;
-    height: 100%;
-    border: 0;
-    border-radius: 0 0 5px 5px;
-}
-
-/* Mobile: the Speedy office-locator widget draws its office popup WIDER than
-   a phone-sized iframe, and the red "Select" button lands beyond the right
-   edge — unreachable, since the popup cannot be panned inside the iframe
-   (reported on a real order attempt, 14.08.2026). The widget is hosted by
-   Speedy, so the only lever we own is the iframe's size: go full-screen on
-   small viewports to give the popup the room it assumes. */
-@media (max-width: 640px) {
-    .speedy-modal-content {
-        margin: 0;
-        width: 100%;
-        max-width: none;
-        height: 100%;
-        border: 0;
-        border-radius: 0;
-    }
-    .speedy-modal-body iframe {
-        border-radius: 0;
-    }
-}
-
-
+/* Mobile: give the map modal the full screen — a half-height map on a
+   phone is unusable for picking a point. */
 /* ── Office/automat map modal ────────────────────────────── */
 .drushfs-map-modal {
     position: fixed;

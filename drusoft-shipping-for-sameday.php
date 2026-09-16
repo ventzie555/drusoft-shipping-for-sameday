@@ -204,7 +204,7 @@ function drushfs_init(): void {
 }
 
 /**
- * Add Drusoft Shipping for Speedy to WooCommerce shipping methods.
+ * Add Drusoft Shipping for Sameday to WooCommerce shipping methods.
  *
  * @param array $methods Existing shipping methods.
  * @return array Updated shipping methods.
@@ -216,55 +216,66 @@ function drushfs_register_method( $methods ) {
 }
 
 /**
- * Check office/automat availability for a given city.
+ * Does Sameday list any SAMEDAY point (PUDO) at all?
  *
- * @param int $city_id Speedy city (site) ID.
- * @return array { @type bool $has_office, @type bool $has_automat }
+ * On 16.09.2026 Bulgaria had 147 easybox and no real PUDO, so the checkout
+ * hides that option until Sameday opens some.
+ *
+ * @return bool
  */
-function drushfs_check_city_availability( int $city_id ): array {
-	$has_office  = false;
-	$has_automat = false;
-
-	if ( $city_id <= 0 ) {
-		return compact( 'has_office', 'has_automat' );
+function drushfs_has_pudo_points(): bool {
+	$cached = get_transient( 'drushfs_has_pudo' );
+	if ( false !== $cached ) {
+		return (bool) $cached;
 	}
 
 	global $wpdb;
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-	$rows = $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT name, office_type FROM {$wpdb->prefix}drushfs_offices WHERE city_id = %d",
-			$city_id
-		)
+	$has = (bool) $wpdb->get_var(
+		"SELECT COUNT(*) FROM {$wpdb->prefix}drushfs_lockers WHERE ooh_type = 1 AND client_visible = 1"
 	);
 
-	foreach ( $rows as $row ) {
-		if ( drushfs_is_automat( $row->office_type, $row->name ) ) {
-			$has_automat = true;
-		} else {
-			$has_office = true;
-		}
-		if ( $has_office && $has_automat ) {
-			break;
-		}
-	}
+	set_transient( 'drushfs_has_pudo', $has ? 1 : 0, HOUR_IN_SECONDS );
 
-	return compact( 'has_office', 'has_automat' );
+	return $has;
 }
 
 /**
- * Determine whether an office row represents an automat (APT/APS).
+ * Which kinds of pickup location Sameday has in a city.
  *
- * @param string $office_type The office_type column value.
- * @param string $name        The office name.
- * @return bool
+ * Keyed on the city NAME, not an id: Sameday addresses a shipment with a city
+ * string plus a county, and has no city-id concept of the Speedy kind.
+ *
+ * @param string $city City name as the customer typed or picked it.
+ * @return array { @type bool $has_easybox, @type bool $has_pudo }
  */
-function drushfs_is_automat( string $office_type, string $name ): bool {
-	return ( stripos( $office_type, 'APT' ) !== false
-		|| stripos( $office_type, 'APS' ) !== false
-		|| mb_stripos( $name, 'АВТОМАТ' ) !== false
-		|| stripos( $name, 'APS' ) !== false
-		|| stripos( $name, 'APT' ) !== false );
+function drushfs_city_point_types( string $city ): array {
+	$has_easybox = false;
+	$has_pudo    = false;
+
+	if ( '' === trim( $city ) ) {
+		return compact( 'has_easybox', 'has_pudo' );
+	}
+
+	global $wpdb;
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	$types = $wpdb->get_col(
+		$wpdb->prepare(
+			"SELECT DISTINCT ooh_type FROM {$wpdb->prefix}drushfs_lockers
+			  WHERE city = %s AND client_visible = 1 AND capacity_exceeded = 0",
+			$city
+		)
+	);
+
+	foreach ( (array) $types as $type ) {
+		if ( 1 === (int) $type ) {
+			$has_pudo = true;
+		} else {
+			$has_easybox = true;
+		}
+	}
+
+	return compact( 'has_easybox', 'has_pudo' );
 }
 
 /**
@@ -284,7 +295,7 @@ function drushfs_get_city_name( int $city_id ): string {
 }
 
 /**
- * Append the selected Speedy service ID to the shipping package so the
+ * Append the delivery choice to the shipping package so the
  * package hash changes whenever the user picks a different service.
  * This forces WooCommerce to re-call calculate_shipping() instead of
  * returning a cached rate.
@@ -366,25 +377,25 @@ function drushfs_vary_package_hash( $packages ) {
 	$payment_method = sanitize_text_field( $merged['payment_method'] ?? '' );
 
 	foreach ( $packages as &$package ) {
-		$package['speedy_selected_service'] = $selected;
+		$package['sameday_selected_service'] = $selected;
 		$package['sameday_delivery_type']    = $delivery_type;
 		$package['sameday_office_id']        = $office_id;
 		$package['sameday_city_id']          = $city_id;
-		$package['speedy_payment_method']   = $payment_method;
+		$package['sameday_payment_method']   = $payment_method;
 	}
 
 	return $packages;
 }
 
 /**
- * Clear cached Speedy price/session data when checkout switches away from Speedy.
+ * Clear our cached delivery choice when checkout switches to another courier.
  *
  * WooCommerce can reuse cached package rates when only the selected shipping
- * method changes. If the previous Speedy calculation stays in the session, the
- * stale Speedy price can remain visible after another method is selected.
+ * method changes. If our previous calculation stays in the session, the stale
+ * price can remain visible after another method is selected.
  */
-add_action( 'woocommerce_checkout_update_order_review', 'drushfs_clear_speedy_when_unselected', 1 );
-function drushfs_clear_speedy_when_unselected( $post_data = '' ): void {
+add_action( 'woocommerce_checkout_update_order_review', 'drushfs_clear_when_unselected', 1 );
+function drushfs_clear_when_unselected( $post_data = '' ): void {
 	parse_str( wp_unslash( (string) $post_data ), $data );
 
 	$shipping_methods = $data['shipping_method'] ?? [];
@@ -403,7 +414,7 @@ function drushfs_clear_speedy_when_unselected( $post_data = '' ): void {
 		}
 	}
 
-	drushfs_clear_speedy_checkout_session();
+	drushfs_clear_checkout_session();
 	if ( ! WC()->session ) {
 		return;
 	}
@@ -416,24 +427,13 @@ function drushfs_clear_speedy_when_unselected( $post_data = '' ): void {
 }
 
 /**
- * Reset only Speedy's calculated price/waybill data, preserving customer address.
+ * Reset our delivery choice, leaving the customer's address alone.
  */
-function drushfs_clear_speedy_checkout_session(): void {
+function drushfs_clear_checkout_session(): void {
 	if ( ! WC()->session ) {
 		return;
 	}
 
-	$service_options = WC()->session->get( 'drushfs_service_options', [] );
-	if ( is_array( $service_options ) ) {
-		foreach ( array_keys( $service_options ) as $service_id ) {
-			WC()->session->set( 'drushfs_shipping_data_' . absint( $service_id ), null );
-		}
-	}
-
-	WC()->session->set( 'drushfs_service_options', [] );
-	WC()->session->set( 'drushfs_selected_service', 0 );
-	WC()->session->set( 'drushfs_shipping_cost', 0 );
-	WC()->session->set( 'drushfs_shipping_data', null );
 	WC()->session->set( 'drushfs_delivery_type', 'address' );
 	WC()->session->set( 'drushfs_office_id', 0 );
 }
@@ -466,7 +466,12 @@ function drushfs_enqueue_scripts(): void {
 	}
 
 	$current_type    = WC()->session ? WC()->session->get( 'drushfs_delivery_type', 'address' ) : 'address';
+	$current_city    = WC()->session ? (string) WC()->session->get( 'drushfs_city_name', '' ) : '';
 	$current_city_id = WC()->session ? WC()->session->get( 'drushfs_city_id', 0 ) : 0;
+
+	if ( '' === $current_city && WC()->customer ) {
+		$current_city = WC()->customer->get_shipping_city() ?: WC()->customer->get_billing_city();
+	}
 	$current_state   = WC()->session ? WC()->session->get( 'drushfs_state', '' ) : '';
 	$current_office  = WC()->session ? WC()->session->get( 'drushfs_office_id', 0 ) : 0;
 
@@ -487,33 +492,38 @@ function drushfs_enqueue_scripts(): void {
 		'nonce'              => wp_create_nonce( 'drushfs_public' ),
 		'method_id'          => 'drushfs_sameday',
 		'current_type'       => $current_type,
+		'current_city'       => $current_city,
+		// Whether SAMEDAY point exists anywhere in the country: the checkout
+		// hides that radio entirely rather than offering an empty picker.
+		'has_pudo_anywhere'  => drushfs_has_pudo_points(),
 		'current_city_id'    => $current_city_id,
 		'current_state'      => $current_state,
 		'current_office_id'  => $current_office,
 		'currency_symbol'    => get_woocommerce_currency_symbol(),
 		'i18n'            => array(
-			'delivery_method'  => __( 'Delivery Method', 'drusoft-shipping-for-sameday' ),
-			'to_address'       => __( 'To Address', 'drusoft-shipping-for-sameday' ),
-			'to_office'        => __( 'To Office', 'drusoft-shipping-for-sameday' ),
-			'to_automat'       => __( 'To Automat', 'drusoft-shipping-for-sameday' ),
-			'select_office'    => __( 'Select Office', 'drusoft-shipping-for-sameday' ),
-			'select_automat'   => __( 'Select Automat', 'drusoft-shipping-for-sameday' ),
-			'select_from_map'  => __( 'Select from Map', 'drusoft-shipping-for-sameday' ),
-			'select_city'      => __( 'Select a city...', 'drusoft-shipping-for-sameday' ),
-			'alert_select_city' => __( 'Please select a city first.', 'drusoft-shipping-for-sameday' ),
-			'no_results'       => __( 'No results', 'drusoft-shipping-for-sameday' ),
-			'select_service'   => __( 'Select Service', 'drusoft-shipping-for-sameday' ),
-			'map_title_office'  => __( 'Pick a Speedy office', 'drusoft-shipping-for-sameday' ),
-			'map_title_automat' => __( 'Pick a Speedy automat', 'drusoft-shipping-for-sameday' ),
-			'map_hint'          => __( 'Click a marker, then choose "Select" in the popup.', 'drusoft-shipping-for-sameday' ),
-			'map_pick'          => __( 'Select this point', 'drusoft-shipping-for-sameday' ),
-			'map_error'         => __( 'Map could not be loaded:', 'drusoft-shipping-for-sameday' ),
-			'map_filter_office'  => __( 'Offices', 'drusoft-shipping-for-sameday' ),
-			'map_filter_automat' => __( 'Automats', 'drusoft-shipping-for-sameday' ),
-			'map_filter_both'    => __( 'Both', 'drusoft-shipping-for-sameday' ),
-			'map_search_placeholder' => __( 'Search by office name or address…', 'drusoft-shipping-for-sameday' ),
-			'map_results_count'      => __( '{n} results', 'drusoft-shipping-for-sameday' ),
-			'map_search_no_results'  => __( 'No matches', 'drusoft-shipping-for-sameday' ),
+			'delivery_method'   => __( 'Начин на доставка', 'drusoft-shipping-for-sameday' ),
+			'to_address'        => __( 'До адрес', 'drusoft-shipping-for-sameday' ),
+			'to_easybox'        => __( 'До easybox', 'drusoft-shipping-for-sameday' ),
+			'to_pudo'           => __( 'До SAMEDAY point', 'drusoft-shipping-for-sameday' ),
+			'select_easybox'    => __( 'Изберете easybox', 'drusoft-shipping-for-sameday' ),
+			'select_pudo'       => __( 'Изберете SAMEDAY point', 'drusoft-shipping-for-sameday' ),
+			'select_from_map'   => __( 'Избери от картата', 'drusoft-shipping-for-sameday' ),
+			'searching'         => __( 'Търсене…', 'drusoft-shipping-for-sameday' ),
+			'no_results'        => __( 'Няма намерени', 'drusoft-shipping-for-sameday' ),
+			'alert_select_point' => __( 'Моля, изберете място за доставка.', 'drusoft-shipping-for-sameday' ),
+			'map_title_easybox' => __( 'Изберете easybox', 'drusoft-shipping-for-sameday' ),
+			'map_title_pudo'    => __( 'Изберете SAMEDAY point', 'drusoft-shipping-for-sameday' ),
+			'map_hint'          => __( 'Щракнете върху маркер и изберете „Избери това място“.', 'drusoft-shipping-for-sameday' ),
+			'map_pick'          => __( 'Избери това място', 'drusoft-shipping-for-sameday' ),
+			'map_error'         => __( 'Картата не можа да се зареди:', 'drusoft-shipping-for-sameday' ),
+			// map.js labels its two filters "offices" and "automats"; for
+			// Sameday those are the staffed points and the lockers.
+			'map_filter_office'  => __( 'SAMEDAY point', 'drusoft-shipping-for-sameday' ),
+			'map_filter_automat' => __( 'easybox', 'drusoft-shipping-for-sameday' ),
+			'map_filter_both'    => __( 'Всички', 'drusoft-shipping-for-sameday' ),
+			'map_search_placeholder' => __( 'Търсене по име, град или адрес…', 'drusoft-shipping-for-sameday' ),
+			'map_results_count'      => __( '{n} резултата', 'drusoft-shipping-for-sameday' ),
+			'map_search_no_results'  => __( 'Няма съвпадения', 'drusoft-shipping-for-sameday' ),
 		)
 	);
 
@@ -528,10 +538,30 @@ function drushfs_enqueue_scripts(): void {
 	);
 
 	if ( is_checkout() ) {
+		// Our own pickup-point map (Leaflet, bundled locally — never a CDN),
+		// the same module the Speedy and Econt plugins use, so a customer who
+		// has met one of our couriers recognises the other two.
+		wp_enqueue_script(
+			'drushfs-map',
+			DRUSHFS_URL . 'assets/js/map.js',
+			array( 'jquery', 'drushfs-common' ),
+			DRUSHFS_VER,
+			true
+		);
+		wp_localize_script(
+			'drushfs-map',
+			'drushfs_map_cfg',
+			array(
+				'leaflet_css'    => DRUSHFS_URL . 'assets/vendor/leaflet/leaflet.css',
+				'leaflet_js'     => DRUSHFS_URL . 'assets/vendor/leaflet/leaflet.js',
+				'leaflet_images' => DRUSHFS_URL . 'assets/vendor/leaflet/images/',
+			)
+		);
+
 		wp_enqueue_script(
 			'drushfs-checkout',
 			DRUSHFS_URL . 'assets/js/checkout.js',
-			array( 'jquery', 'select2', 'drushfs-common' ),
+			array( 'jquery', 'select2', 'drushfs-common', 'drushfs-map' ),
 			DRUSHFS_VER,
 			true
 		);
@@ -547,10 +577,11 @@ function drushfs_enqueue_scripts(): void {
 	}
 
 	if ( is_cart() ) {
-		// Pre-compute availability so the JS doesn't need an AJAX call on load
-		$availability = drushfs_check_city_availability( $current_city_id );
-		$params['has_office']  = $availability['has_office'];
-		$params['has_automat'] = $availability['has_automat'];
+		// Pre-compute which kinds of point exist in the customer's city, so the
+		// cart JS can show the right radios without an extra round trip.
+		$types                 = drushfs_city_point_types( $current_city );
+		$params['has_easybox'] = $types['has_easybox'];
+		$params['has_pudo']    = $types['has_pudo'];
 
 		wp_enqueue_script(
 			'drushfs-cart',
@@ -578,13 +609,13 @@ function drushfs_enqueue_scripts(): void {
 add_action( 'woocommerce_cart_contents', 'drushfs_cart_hidden_fields' );
 function drushfs_cart_hidden_fields(): void {
 	$delivery_type = WC()->session ? WC()->session->get( 'drushfs_delivery_type', 'address' ) : 'address';
-	$city_id       = WC()->session ? absint( WC()->session->get( 'drushfs_city_id', 0 ) ) : 0;
-	echo '<input type="hidden" name="sameday_delivery_type" id="speedy_cart_delivery_type" value="' . esc_attr( $delivery_type ) . '">';
-	echo '<input type="hidden" name="sameday_city_id" id="speedy_cart_city_id" value="' . esc_attr( $city_id ) . '">';
+	$city          = WC()->session ? (string) WC()->session->get( 'drushfs_city_name', '' ) : '';
+	echo '<input type="hidden" name="sameday_delivery_type" id="sameday_cart_delivery_type" value="' . esc_attr( $delivery_type ) . '">';
+	echo '<input type="hidden" name="sameday_city" id="sameday_cart_city" value="' . esc_attr( $city ) . '">';
 }
 
 /**
- * After each Speedy shipping rate is rendered, output a hidden element with
+ * After each Sameday shipping rate is rendered, output a hidden element with
  * availability data so the JS can read it from the DOM after cart updates.
  */
 add_action( 'woocommerce_after_shipping_rate', 'drushfs_output_availability_data', 10, 2 );
@@ -593,17 +624,20 @@ function drushfs_output_availability_data( $method ): void {
 		return;
 	}
 
-	$city_id = WC()->session ? absint( WC()->session->get( 'drushfs_city_id', 0 ) ) : 0;
-	if ( $city_id <= 0 ) {
+	$city = WC()->session ? (string) WC()->session->get( 'drushfs_city_name', '' ) : '';
+	if ( '' === $city && WC()->customer ) {
+		$city = WC()->customer->get_shipping_city() ?: WC()->customer->get_billing_city();
+	}
+	if ( '' === trim( $city ) ) {
 		return;
 	}
 
-	$availability = drushfs_check_city_availability( $city_id );
+	$types = drushfs_city_point_types( $city );
 
 	printf(
-		'<span id="speedy-availability-data" data-has-office="%s" data-has-automat="%s" style="display:none;"></span>',
-		esc_attr( $availability['has_office'] ? '1' : '0' ),
-		esc_attr( $availability['has_automat'] ? '1' : '0' )
+		'<span id="sameday-availability-data" data-has-easybox="%s" data-has-pudo="%s" style="display:none;"></span>',
+		esc_attr( $types['has_easybox'] ? '1' : '0' ),
+		esc_attr( $types['has_pudo'] ? '1' : '0' )
 	);
 }
 
@@ -705,22 +739,22 @@ function drushfs_get_office_label_by_id( int $office_id ): int|string {
 	global $wpdb;
 
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-	$office = $wpdb->get_row(
+	$point = $wpdb->get_row(
 		$wpdb->prepare(
-			"SELECT name, address FROM {$wpdb->prefix}drushfs_offices WHERE id = %d",
+			"SELECT name, address, city FROM {$wpdb->prefix}drushfs_lockers WHERE ooh_id = %d",
 			$office_id
 		)
 	);
 
-	if ( $office ) {
-		return sprintf( '%s %s - %s', $office_id, $office->name, $office->address );
+	if ( $point ) {
+		return sprintf( '%s %s, %s - %s', $office_id, $point->name, $point->city, $point->address );
 	}
 
 	return $office_id;
 }
 
 /**
- * Show the chosen Speedy office (name + address) on the admin order screen.
+ * Show the chosen pickup location (name + address) on the admin order screen.
  *
  * The selected office is stored only as a numeric ID (_drushfs_office_id), so
  * without this the merchant has to generate a waybill to see which office the
@@ -743,22 +777,20 @@ function drushfs_admin_show_office( $order ): void {
 
 	global $wpdb;
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-	$office = $wpdb->get_row(
+	$point = $wpdb->get_row(
 		$wpdb->prepare(
-			"SELECT name, address, office_type FROM {$wpdb->prefix}drushfs_offices WHERE id = %d",
+			"SELECT name, address, city, ooh_type FROM {$wpdb->prefix}drushfs_lockers WHERE ooh_id = %d",
 			$office_id
 		)
 	);
 
-	// Label automats (APT/APS) distinctly from regular offices.
-	$is_automat = $office && drushfs_is_automat( (string) $office->office_type, (string) $office->name );
-	$label      = $is_automat
-		? __( 'Speedy automat', 'drusoft-shipping-for-sameday' )
-		: __( 'Speedy office', 'drusoft-shipping-for-sameday' );
+	$label = ( $point && 1 === (int) $point->ooh_type )
+		? __( 'SAMEDAY point', 'drusoft-shipping-for-sameday' )
+		: __( 'Sameday easybox', 'drusoft-shipping-for-sameday' );
 
-	$value = $office
-		? sprintf( '%s — %s', $office->name, $office->address )
-		: __( 'Office not found in local database — please sync offices.', 'drusoft-shipping-for-sameday' );
+	$value = $point
+		? sprintf( '%s, %s — %s', $point->name, $point->city, $point->address )
+		: __( 'Pickup location not found locally — wait for the daily refresh.', 'drusoft-shipping-for-sameday' );
 
 	echo '<p class="form-field form-field-wide"><strong>' .
 		esc_html( $label ) . ':</strong><br>' .
@@ -767,7 +799,7 @@ function drushfs_admin_show_office( $order ): void {
 }
 
 /**
- * Resolve the customer-facing Speedy parcel-tracking info for an order.
+ * Resolve the customer-facing parcel-tracking info for an order.
  *
  * @param WC_Order $order The order.
  * @return array{waybill:string,url:string}|null Null when there is no Speedy waybill yet.
@@ -778,16 +810,16 @@ function drushfs_get_tracking_info( $order ): ?array {
 	}
 	$waybill = (string) $order->get_meta( '_drushfs_waybill_id' );
 	if ( '' === $waybill ) {
-		return null; // not shipped yet / not a Speedy waybill
+		return null; // not shipped yet
 	}
 	return array(
 		'waybill' => $waybill,
-		'url'     => 'https://www.speedy.bg/track?id=' . rawurlencode( $waybill ),
+		'url'     => 'https://sameday.bg/awb-tracking/?awb=' . rawurlencode( $waybill ),
 	);
 }
 
 /**
- * Show the Speedy parcel-tracking link to the customer on the order details
+ * Show the parcel-tracking link to the customer on the order details
  * (order-received page, My Account → order, and the order-tracking page).
  *
  * @param WC_Order $order The order.
@@ -801,12 +833,12 @@ function drushfs_order_details_tracking( $order ): void {
 	echo '<section class="drushfs-tracking" style="margin:0 0 24px">';
 	echo '<h2>' . esc_html__( 'Parcel tracking', 'drusoft-shipping-for-sameday' ) . '</h2>';
 	echo '<p>' . esc_html__( 'Waybill number', 'drusoft-shipping-for-sameday' ) . ': <strong>' . esc_html( $t['waybill'] ) . '</strong><br>';
-	echo '<a href="' . esc_url( $t['url'] ) . '" target="_blank" rel="noopener">' . esc_html__( 'Track your parcel with Speedy', 'drusoft-shipping-for-sameday' ) . '</a></p>';
+	echo '<a href="' . esc_url( $t['url'] ) . '" target="_blank" rel="noopener">' . esc_html__( 'Проследи пратката в Sameday', 'drusoft-shipping-for-sameday' ) . '</a></p>';
 	echo '</section>';
 }
 
 /**
- * Append the Speedy tracking link to customer order emails (skips admin copies).
+ * Append the tracking link to customer order emails (skips admin copies).
  * Appears once the waybill exists — e.g. on the completed-order email.
  *
  * @param WC_Order $order         The order.
@@ -823,83 +855,59 @@ function drushfs_email_tracking( $order, $sent_to_admin = false, $plain_text = f
 		return;
 	}
 	if ( $plain_text ) {
-		echo "\n" . esc_html__( 'Parcel tracking', 'drusoft-shipping-for-sameday' ) . ' (' . esc_html__( 'Speedy', 'drusoft-shipping-for-sameday' ) . "):\n";
+		echo "\n" . esc_html__( 'Parcel tracking', 'drusoft-shipping-for-sameday' ) . ' (' . esc_html__( 'Sameday', 'drusoft-shipping-for-sameday' ) . "):\n";
 		echo esc_html__( 'Waybill number', 'drusoft-shipping-for-sameday' ) . ': ' . esc_html( $t['waybill'] ) . "\n";
 		echo esc_url( $t['url'] ) . "\n";
 	} else {
 		echo '<h2>' . esc_html__( 'Parcel tracking', 'drusoft-shipping-for-sameday' ) . '</h2>';
 		echo '<p>' . esc_html__( 'Waybill number', 'drusoft-shipping-for-sameday' ) . ': <strong>' . esc_html( $t['waybill'] ) . '</strong><br>';
-		echo '<a href="' . esc_url( $t['url'] ) . '">' . esc_html__( 'Track your parcel with Speedy', 'drusoft-shipping-for-sameday' ) . '</a></p>';
+		echo '<a href="' . esc_url( $t['url'] ) . '">' . esc_html__( 'Проследи пратката в Sameday', 'drusoft-shipping-for-sameday' ) . '</a></p>';
 	}
 }
 
 /**
- * AJAX Handler for searching cities via Speedy API.
- * Used by Select2 in admin settings.
+ * City search for the settings screen.
+ *
+ * Reads the cities the daily sync stores locally. The Speedy version of this
+ * called that courier's location API with the shop's credentials; Sameday's
+ * city list is already on disk, so there is nothing to ask.
  */
 add_action( 'wp_ajax_drushfs_search_cities', 'drushfs_search_cities' );
 function drushfs_search_cities(): void {
 	check_ajax_referer( 'drushfs_admin', 'nonce' );
 
-	// Check permissions
 	if ( ! current_user_can( 'manage_woocommerce' ) ) {
 		wp_send_json_error( __( 'Permission denied.', 'drusoft-shipping-for-sameday' ) );
 	}
 
 	$term = isset( $_GET['term'] ) ? sanitize_text_field( wp_unslash( $_GET['term'] ) ) : '';
-	if ( empty( $term ) ) {
-		wp_send_json_success( [] );
+	if ( '' === $term ) {
+		wp_send_json( array( 'results' => array() ) );
 	}
 
-	// We need credentials to query the API.
-	// Since this is a global AJAX handler, we need to find *some* valid credentials.
-	// We'll try to get them from the first configured instance.
-	$credentials = drushfs_get_first_credentials();
-	$username = $credentials['username'] ?? '';
-	$password = $credentials['password'] ?? '';
+	global $wpdb;
+	$like = '%' . $wpdb->esc_like( $term ) . '%';
 
-	if ( empty( $username ) || empty( $password ) ) {
-		wp_send_json_error( __( 'No API credentials found.', 'drusoft-shipping-for-sameday' ) );
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	$rows = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT id, name, county, postal_code FROM {$wpdb->prefix}drushfs_cities
+			  WHERE name LIKE %s OR latin_name LIKE %s
+			  ORDER BY name ASC LIMIT 50",
+			$like,
+			$like
+		)
+	);
+
+	$results = array();
+	foreach ( (array) $rows as $row ) {
+		$results[] = array(
+			'id'   => (int) $row->id,
+			'text' => sprintf( '%s, %s (%s)', $row->name, $row->county, $row->postal_code ),
+		);
 	}
 
-	// Call Speedy API
-	$body = json_encode( [
-		'userName' => $username,
-		'password' => $password,
-		'language' => 'BG',
-		'countryId' => 100, // Bulgaria
-		'name'     => $term,
-	] );
-
-	$response = wp_remote_post( 'https://api.speedy.bg/v1/location/site', [
-		'headers' => [ 'Content-Type' => 'application/json' ],
-		'body'    => $body,
-		'timeout' => 10,
-	] );
-
-	if ( is_wp_error( $response ) ) {
-		wp_send_json_error( $response->get_error_message() );
-	}
-
-	$data = json_decode( wp_remote_retrieve_body( $response ), true );
-	$results = [];
-
-	if ( isset( $data['sites'] ) && is_array( $data['sites'] ) ) {
-		foreach ( $data['sites'] as $site ) {
-			// Format: "Sofia, Stolichna"
-			$label = $site['name'];
-			if ( ! empty( $site['municipality'] ) ) {
-				$label .= ', ' . $site['municipality'];
-			}
-			
-			$results[] = [
-				'id'   => $site['id'], 
-				'text' => $label
-			];
-		}
-	}
-
-	wp_send_json( [ 'results' => $results ] ); // Select2 v4+ expects results in a 'results' key
+	wp_send_json( array( 'results' => $results ) );
 }
 
 /**
@@ -951,11 +959,142 @@ function drushfs_search_offices(): void {
 }
 
 /**
+ * Pickup-location search for the checkout dropdown.
+ *
+ * Separate from drushfs_search_offices(), which serves the settings screen and
+ * rightly demands the admin nonce and manage_woocommerce — a customer has
+ * neither. This one is public by necessity, so it reads nothing but our own
+ * synced table and returns nothing a visitor could not see by walking the
+ * Sameday locker map themselves.
+ */
+add_action( 'wp_ajax_drushfs_find_points', 'drushfs_find_points_ajax' );
+add_action( 'wp_ajax_nopriv_drushfs_find_points', 'drushfs_find_points_ajax' );
+function drushfs_find_points_ajax(): void {
+	check_ajax_referer( 'drushfs_public', 'nonce' );
+
+	$term = isset( $_POST['term'] ) ? sanitize_text_field( wp_unslash( $_POST['term'] ) ) : '';
+	$type = isset( $_POST['delivery_type'] ) ? sanitize_text_field( wp_unslash( $_POST['delivery_type'] ) ) : 'easybox';
+	$city = isset( $_POST['city'] ) ? sanitize_text_field( wp_unslash( $_POST['city'] ) ) : '';
+
+	global $wpdb;
+
+	$ooh_type = ( 'pudo' === $type ) ? 1 : 0;
+
+	$sql    = "SELECT ooh_id, name, city, address, postal_code, occupancy_level, supported_payment
+	             FROM {$wpdb->prefix}drushfs_lockers
+	            WHERE client_visible = 1 AND capacity_exceeded = 0 AND ooh_type = %d";
+	$params = array( $ooh_type );
+
+	// A customer who has named their city should see that city first; the
+	// search box still reaches the whole country.
+	if ( '' !== $city && '' === $term ) {
+		$sql     .= ' AND city = %s';
+		$params[] = $city;
+	}
+
+	if ( '' !== $term ) {
+		$like     = '%' . $wpdb->esc_like( $term ) . '%';
+		$sql     .= ' AND (name LIKE %s OR city LIKE %s OR address LIKE %s)';
+		$params[] = $like;
+		$params[] = $like;
+		$params[] = $like;
+	}
+
+	$sql .= ' ORDER BY city ASC, name ASC LIMIT 100';
+
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+	$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A );
+
+	$results = array();
+	foreach ( (array) $rows as $row ) {
+		$results[] = array(
+			'id'      => (int) $row['ooh_id'],
+			'name'    => $row['name'],
+			'city'    => $row['city'],
+			'address' => $row['address'],
+			'text'    => sprintf( '%s, %s — %s', $row['name'], $row['city'], $row['address'] ),
+			// Sameday reports how full a locker is; a customer is better off
+			// knowing before they choose it.
+			'busy'    => (int) $row['occupancy_level'] > 1,
+			'card'    => 1 === (int) $row['supported_payment'],
+		);
+	}
+
+	wp_send_json_success( $results );
+}
+
+/**
+ * Every pickup location, for the map.
+ *
+ * The map fetches this once per checkout and filters client-side, so changing
+ * the filter or the search term costs nothing. Cached for an hour: the daily
+ * sync is the only thing that changes the table.
+ *
+ * Field names follow what assets/js/map.js reads — id, name, address, lat, lng,
+ * city_name, city_id, office_type — so the module stays identical across the
+ * Speedy, Econt and Sameday plugins. The id is oohId, the value Sameday wants
+ * back as oohLastMile; the record's own "id" would book the wrong locker.
+ */
+add_action( 'wp_ajax_drushfs_get_all_points', 'drushfs_get_all_points_ajax' );
+add_action( 'wp_ajax_nopriv_drushfs_get_all_points', 'drushfs_get_all_points_ajax' );
+function drushfs_get_all_points_ajax(): void {
+	check_ajax_referer( 'drushfs_public', 'nonce' );
+
+	$cached = get_transient( 'drushfs_all_points' );
+	if ( false !== $cached ) {
+		wp_send_json_success( $cached );
+	}
+
+	global $wpdb;
+
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	$rows = $wpdb->get_results(
+		"SELECT ooh_id, name, address, city, city_id, postal_code, latitude, longitude,
+		        ooh_type, supported_payment, occupancy_level
+		   FROM {$wpdb->prefix}drushfs_lockers
+		  WHERE client_visible = 1
+		    AND capacity_exceeded = 0
+		    AND latitude <> '' AND longitude <> ''
+		  ORDER BY city ASC, name ASC"
+	);
+
+	$payload = [];
+	foreach ( (array) $rows as $row ) {
+		$lat = (float) $row->latitude;
+		$lng = (float) $row->longitude;
+
+		// A point at 0,0 is a data fault, not the Gulf of Guinea.
+		if ( 0.0 === $lat && 0.0 === $lng ) {
+			continue;
+		}
+
+		$payload[] = [
+			'id'          => (int) $row->ooh_id,
+			'name'        => $row->name,
+			'address'     => $row->address,
+			'city_name'   => $row->city,
+			'city_id'     => (int) $row->city_id,
+			'post_code'   => $row->postal_code,
+			'lat'         => $lat,
+			'lng'         => $lng,
+			// map.js switches its marker and filter on this: 'APS' is the
+			// locker-style point, anything else renders as a staffed one.
+			'office_type' => ( (int) $row->ooh_type === 1 ) ? 'PUDO' : 'APS',
+			'card'        => (int) $row->supported_payment === 1,
+		];
+	}
+
+	set_transient( 'drushfs_all_points', $payload, HOUR_IN_SECONDS );
+
+	wp_send_json_success( $payload );
+}
+
+/**
  * AJAX Handler for file uploads in admin settings.
  */
 
 /**
- * Helper: Retrieve the first available Speedy API credentials from settings.
+ * Helper: Retrieve the first available Sameday API credentials from settings.
  *
  * @return array|null Array with 'username' and 'password' keys, or null if not found.
  */
@@ -995,7 +1134,7 @@ function drushfs_get_first_instance_id(): int {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 	$name = $wpdb->get_var(
 		"SELECT option_name FROM $wpdb->options
-		 WHERE option_name LIKE 'woocommerce\_drushfs\_speedy\_%\_settings' LIMIT 1"
+		 WHERE option_name LIKE 'woocommerce\_drushfs\_sameday\_%\_settings' LIMIT 1"
 	);
 	return $name && preg_match( '/_(\d+)_settings$/', $name, $m ) ? (int) $m[1] : 0;
 }
@@ -1020,10 +1159,10 @@ function drushfs_product_pickup_field(): void {
 	}
 	woocommerce_wp_select( [
 		'id'          => '_drushfs_pickup_profile',
-		'label'       => __( 'Speedy pickup point', 'drusoft-shipping-for-sameday' ),
+		'label'       => __( 'Sameday pickup point', 'drusoft-shipping-for-sameday' ),
 		'options'     => $options,
 		'desc_tip'    => true,
-		'description' => __( 'Where Speedy collects this product from (e.g. a supplier warehouse for dropshipping).', 'drusoft-shipping-for-sameday' ),
+		'description' => __( 'Where Sameday collects this product from (e.g. a supplier warehouse for dropshipping).', 'drusoft-shipping-for-sameday' ),
 	] );
 }
 add_action( 'woocommerce_product_options_shipping', 'drushfs_product_pickup_field' );
@@ -1076,7 +1215,7 @@ function drushfs_admin_pickup_selector( $order ): void {
 		$current = 'default';
 	}
 	echo '<p class="form-field form-field-wide"><label for="drushfs_pickup_profile"><strong>'
-		. esc_html__( 'Speedy pickup point', 'drusoft-shipping-for-sameday' ) . '</strong></label>';
+		. esc_html__( 'Sameday pickup point', 'drusoft-shipping-for-sameday' ) . '</strong></label>';
 	echo '<select name="drushfs_pickup_profile" id="drushfs_pickup_profile">';
 	foreach ( $profiles as $key => $p ) {
 		printf(
@@ -1161,7 +1300,7 @@ function drushfs_get_region_map(): array {
 }
 
 /**
- * AJAX Handler: Save cart Speedy selections to WC session.
+ * AJAX Handler: Save the cart's delivery choice to the WC session.
  * Called from cart.js whenever the user changes state, city, delivery type, or office.
  * This ensures the data persists to the checkout page even without clicking "Update Cart".
  */
@@ -1175,35 +1314,20 @@ function drushfs_save_cart_selection_ajax(): void {
 		wp_send_json_error( 'No session' );
 	}
 
-	$state         = isset( $_POST['state'] ) ? sanitize_text_field( wp_unslash( $_POST['state'] ) ) : '';
-	$city_id       = isset( $_POST['city_id'] ) ? absint( $_POST['city_id'] ) : 0;
+	$city          = isset( $_POST['city'] ) ? sanitize_text_field( wp_unslash( $_POST['city'] ) ) : '';
 	$delivery_type = isset( $_POST['delivery_type'] ) ? sanitize_text_field( wp_unslash( $_POST['delivery_type'] ) ) : 'address';
 	$office_id     = isset( $_POST['office_id'] ) ? absint( $_POST['office_id'] ) : 0;
 
-	if ( $state ) {
-		WC()->session->set( 'drushfs_state', $state );
+	if ( ! in_array( $delivery_type, array( 'address', 'easybox', 'pudo' ), true ) ) {
+		$delivery_type = 'address';
 	}
-	if ( $city_id ) {
-		WC()->session->set( 'drushfs_city_id', $city_id );
-	}
-	if ( $delivery_type ) {
-		WC()->session->set( 'drushfs_delivery_type', $delivery_type );
-	}
-	WC()->session->set( 'drushfs_office_id', $office_id );
 
-	// Also update the WC customer so checkout form fields are pre-filled
-	if ( WC()->customer ) {
-		if ( $state ) {
-			WC()->customer->set_shipping_state( $state );
-			WC()->customer->set_billing_state( $state );
-		}
-		if ( $city_id ) {
-			$city_name = drushfs_get_city_name( $city_id );
-			WC()->customer->set_shipping_city( $city_name ?: $city_id );
-			WC()->customer->set_billing_city( $city_name ?: $city_id );
-		}
-		WC()->customer->save();
+	if ( '' !== $city ) {
+		WC()->session->set( 'drushfs_city_name', $city );
 	}
+
+	WC()->session->set( 'drushfs_delivery_type', $delivery_type );
+	WC()->session->set( 'drushfs_office_id', $office_id );
 
 	wp_send_json_success();
 }
@@ -1304,14 +1428,14 @@ function drushfs_validate_checkout(): void {
 	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce in woocommerce_checkout_process.
 	$delivery_type = isset( $_POST['sameday_delivery_type'] ) ? sanitize_text_field( wp_unslash( $_POST['sameday_delivery_type'] ) ) : 'address';
 
-	if ( 'office' === $delivery_type || 'automat' === $delivery_type ) {
+	if ( 'easybox' === $delivery_type || 'pudo' === $delivery_type ) {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce in woocommerce_checkout_process.
 		$office_id = isset( $_POST['sameday_office_id'] ) ? sanitize_text_field( wp_unslash( $_POST['sameday_office_id'] ) ) : '';
 
 		if ( empty( $office_id ) ) {
-			$error_msg = ( 'office' === $delivery_type ) 
-				? __( 'Please select a Speedy office.', 'drusoft-shipping-for-sameday' ) 
-				: __( 'Please select a Speedy automat.', 'drusoft-shipping-for-sameday' );
+			$error_msg = ( 'pudo' === $delivery_type )
+				? __( 'Моля, изберете SAMEDAY point.', 'drusoft-shipping-for-sameday' )
+				: __( 'Моля, изберете easybox.', 'drusoft-shipping-for-sameday' );
 			
 			wc_add_notice( $error_msg, 'error' );
 		}
@@ -1360,7 +1484,7 @@ function drushfs_save_order_meta( $order_id ): void {
 }
 
 /**
- * AJAX Handler: Update cart selection for Speedy.
+ * AJAX Handler: Update the cart's delivery choice.
  */
 add_action( 'wp_ajax_drushfs_update_cart_selection', 'drushfs_update_cart_selection' );
 add_action( 'wp_ajax_nopriv_drushfs_update_cart_selection', 'drushfs_update_cart_selection' );
@@ -1369,49 +1493,52 @@ function drushfs_update_cart_selection(): void {
 	check_ajax_referer( 'drushfs_public', 'nonce' );
 
 	$delivery_type = isset( $_POST['delivery_type'] ) ? sanitize_text_field( wp_unslash( $_POST['delivery_type'] ) ) : 'address';
-	$city_id       = isset( $_POST['city_id'] ) ? absint( $_POST['city_id'] ) : 0;
-	$state         = isset( $_POST['state'] ) ? sanitize_text_field( wp_unslash( $_POST['state'] ) ) : '';
+	$city          = isset( $_POST['city'] ) ? sanitize_text_field( wp_unslash( $_POST['city'] ) ) : '';
 
 	if ( ! WC()->session ) {
 		wp_send_json_error();
 	}
 
-	WC()->session->set( 'drushfs_delivery_type', $delivery_type );
-	
-	if ( ! empty( $state ) ) {
-		WC()->session->set( 'drushfs_state', $state );
-		if ( WC()->customer ) {
-			WC()->customer->set_shipping_state( $state );
-			WC()->customer->set_billing_state( $state );
-		}
+	if ( ! in_array( $delivery_type, array( 'address', 'easybox', 'pudo' ), true ) ) {
+		$delivery_type = 'address';
 	}
 
-	if ( $city_id > 0 ) {
-		WC()->session->set( 'drushfs_city_id', $city_id );
+	WC()->session->set( 'drushfs_delivery_type', $delivery_type );
+
+	if ( '' !== $city ) {
+		WC()->session->set( 'drushfs_city_name', $city );
 
 		if ( WC()->customer ) {
-			$city_name = drushfs_get_city_name( $city_id );
-			WC()->customer->set_shipping_city( $city_name ?: $city_id );
-			WC()->customer->set_billing_city( $city_name ?: $city_id );
+			WC()->customer->set_shipping_city( $city );
+			WC()->customer->set_billing_city( $city );
+			WC()->customer->save();
 		}
 	} else {
-		$city_id = absint( WC()->session->get( 'drushfs_city_id', 0 ) );
+		$city = (string) WC()->session->get( 'drushfs_city_name', '' );
 	}
 
-	if ( WC()->customer ) {
-		WC()->customer->save();
-	}
-	
-	if ( 'office' === $delivery_type || 'automat' === $delivery_type ) {
-		$office_id = Drushfs_Shipping_Method::get_first_available_office( $city_id, $delivery_type );
-		WC()->session->set( 'drushfs_office_id', $office_id );
+	// The exact point is chosen at checkout; on the cart we only need the type
+	// to price it, so any visible point in the city stands in for the quote.
+	if ( 'easybox' === $delivery_type || 'pudo' === $delivery_type ) {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$point_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT ooh_id FROM {$wpdb->prefix}drushfs_lockers
+				  WHERE city = %s AND ooh_type = %d AND client_visible = 1 AND capacity_exceeded = 0
+				  ORDER BY occupancy_level ASC LIMIT 1",
+				$city,
+				( 'pudo' === $delivery_type ) ? 1 : 0
+			)
+		);
+		WC()->session->set( 'drushfs_office_id', $point_id );
 	} else {
 		WC()->session->set( 'drushfs_office_id', 0 );
 	}
 
-	// Check office/automat availability for this city so the JS can
-	// update the radio buttons without a separate AJAX call.
-	$availability = drushfs_check_city_availability( $city_id );
+	// Which point kinds this city has, so the JS can update the radios
+	// without a second round trip.
+	$availability = drushfs_city_point_types( $city );
 
 	// Clear shipping cache
 	$packages = WC()->cart ? WC()->cart->get_shipping_packages() : [];
@@ -1421,7 +1548,7 @@ function drushfs_update_cart_selection(): void {
 
 	wp_send_json_success([
 		'current_type' => $delivery_type,
-		'has_office'   => $availability['has_office'],
-		'has_automat'  => $availability['has_automat'],
+		'has_easybox'  => $availability['has_easybox'],
+		'has_pudo'     => $availability['has_pudo'],
 	]);
 }
