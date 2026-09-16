@@ -1,0 +1,368 @@
+/* Drusoft Shipping for Speedy Checkout Styles */
+
+/* Reduce font size ONLY for Speedy Office/Automat dropdowns */
+#speedy-office-field .select2-container .select2-selection--single {
+    height: 32px; /* Standard WC height is usually around 40px, reducing slightly */
+    display: flex;
+    align-items: center;
+}
+
+#speedy-office-field .select2-container--default .select2-selection--single .select2-selection__rendered {
+    font-size: 13px; /* Smaller font for long addresses */
+    line-height: 1.2; /* Allow multi-line if needed, or tight single line */
+    padding-left: 8px;
+    padding-right: 20px; /* Space for arrow */
+    color: #444;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+/* Center the arrow vertically */
+#speedy-office-field .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 30px;
+    top: 1px;
+}
+
+/* Adjust dropdown results font size for Offices/Automats */
+.select2-results__option {
+    font-size: 13px;
+    padding: 6px 10px;
+}
+
+/* Service Selector (radio buttons) */
+#speedy-service-field {
+    max-width: 100%;
+}
+
+#speedy-service-field .speedy-service-option {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: normal;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+#speedy-service-field .speedy-service-option input[type="radio"] {
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+/* Ensure radio buttons are aligned nicely */
+#speedy-delivery-type-wrapper label {
+    font-weight: normal;
+    margin-right: 15px;
+    cursor: pointer;
+}
+
+#speedy-delivery-type-wrapper input[type="radio"] {
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+/* Speedy Map Modal */
+.speedy-modal {
+    display: none;
+    position: fixed;
+    z-index: 99999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.speedy-modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border: 1px solid #888;
+    width: 90%;
+    max-width: 1000px;
+    height: 80%;
+    position: relative;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+    border-radius: 5px;
+}
+
+.speedy-modal-header {
+    padding: 10px 15px;
+    background: #f1f1f1;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 5px 5px 0 0;
+}
+
+.speedy-modal-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.speedy-close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 20px;
+}
+
+.speedy-close:hover,
+.speedy-close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.speedy-modal-body {
+    height: calc(100% - 41px); /* Header height approx */
+    width: 100%;
+}
+
+.speedy-modal-body iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0 0 5px 5px;
+}
+
+/* Mobile: the Speedy office-locator widget draws its office popup WIDER than
+   a phone-sized iframe, and the red "Select" button lands beyond the right
+   edge — unreachable, since the popup cannot be panned inside the iframe
+   (reported on a real order attempt, 14.08.2026). The widget is hosted by
+   Speedy, so the only lever we own is the iframe's size: go full-screen on
+   small viewports to give the popup the room it assumes. */
+@media (max-width: 640px) {
+    .speedy-modal-content {
+        margin: 0;
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        border: 0;
+        border-radius: 0;
+    }
+    .speedy-modal-body iframe {
+        border-radius: 0;
+    }
+}
+
+
+/* ── Office/automat map modal ────────────────────────────── */
+.drushfs-map-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 99999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.drushfs-map-modal.is-open {
+    display: flex;
+}
+
+.drushfs-map-modal__content {
+    background: #fff;
+    width: 90vw;
+    max-width: 960px;
+    height: 80vh;
+    max-height: 720px;
+    border-radius: 6px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.drushfs-map-modal__title {
+    margin: 0;
+    padding: 14px 48px 14px 18px;
+    font-size: 16px;
+    font-weight: 600;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.drushfs-map-modal__close {
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 0;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: #555;
+    padding: 0;
+}
+
+.drushfs-map-modal__close:hover { color: #000; }
+
+.drushfs-map-modal__map {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 300px;
+}
+
+.drushfs-map-modal__hint {
+    margin: 0;
+    padding: 8px 18px;
+    border-top: 1px solid #e5e5e5;
+    font-size: 12px;
+    color: #666;
+    background: #f7f7f7;
+}
+
+.drushfs-map-popup {
+    min-width: 180px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* Filter strip inside the office map modal */
+.drushfs-map-modal__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: center;
+    padding: 8px 14px;
+    border-bottom: 1px solid #e5e5e5;
+    background: #fafafa;
+    font-size: 13px;
+}
+
+.drushfs-map-modal__radios {
+    display: flex;
+    gap: 8px;
+}
+
+.drushfs-map-modal__radios label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+    margin: 0;
+}
+
+.drushfs-map-modal__search {
+    flex: 1 1 200px;
+    min-width: 180px;
+    padding: 5px 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+.drushfs-map-modal__count {
+    color: #666;
+    font-size: 12px;
+    margin-left: auto;
+}
+
+.drushfs-map-popup__city {
+    color: #555;
+    font-size: 12px;
+}
+
+/* Search input + suggestions list */
+.drushfs-map-modal__search-wrap {
+    position: relative;
+    flex: 1 1 240px;
+    min-width: 200px;
+    /* Own stacking context so the dropdown reliably renders above the
+       Leaflet map canvas below it (Leaflet panes use z-index 400–800). */
+    z-index: 1000;
+}
+
+.drushfs-map-modal__search-wrap .drushfs-map-modal__search {
+    width: 100%;
+}
+
+.drushfs-map-modal__suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin: 2px 0 0 0;
+    padding: 0;
+    list-style: none;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+    /* Leaflet panes occupy z-index 400–800 (popup pane at 700, controls at
+       800). The suggestion list must sit clearly above all of them so the
+       map canvas doesn't paint over it immediately after we render. */
+    z-index: 1001;
+    font-size: 13px;
+}
+
+.drushfs-map-modal__suggestions li {
+    padding: 6px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    line-height: 1.35;
+}
+
+.drushfs-map-modal__suggestions li:last-child { border-bottom: 0; }
+.drushfs-map-modal__suggestions li:hover { background: #f4f9ff; }
+
+.drushfs-map-modal__suggestion-empty {
+    color: #888;
+    font-style: italic;
+    cursor: default !important;
+}
+.drushfs-map-modal__suggestion-empty:hover { background: transparent !important; }
+
+.drushfs-map-modal__sug-name {
+    font-weight: 600;
+}
+
+.drushfs-map-modal__sug-city {
+    color: #555;
+    font-size: 12px;
+}
+
+.drushfs-map-modal__sug-addr {
+    color: #777;
+    font-size: 12px;
+}
+
+/* Phones: the centred 80vh dialog overflows once the browser's URL bar eats
+   into the layout viewport (100vh > visible height), producing a scrollbar
+   inside the modal; the filter pills can also overflow sideways. Go full
+   screen with dynamic-viewport units and let the map flex to the remainder. */
+@media (max-width: 640px) {
+    .drushfs-map-modal.is-open {
+        align-items: stretch;
+        justify-content: stretch;
+    }
+    .drushfs-map-modal__content {
+        width: 100vw;
+        max-width: none;
+        height: 100dvh;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+    .drushfs-map-modal__filters {
+        flex-wrap: wrap;
+        row-gap: 6px;
+    }
+    .drushfs-map-modal__map {
+        min-height: 0;
+    }
+    .drushfs-map-modal__hint {
+        display: none;
+    }
+}

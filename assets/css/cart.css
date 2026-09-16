@@ -1,0 +1,73 @@
+/**
+ * Drusoft Shipping for Speedy — Cart page styles
+ */
+
+/* ─── Delivery-type selector ────────────────────────── */
+
+#speedy-cart-selector {
+	display: none;
+	margin-top: 15px;
+	padding: 15px;
+	border: 1px solid #dcdcdc;
+	border-radius: 8px;
+	background: #ffffff;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+	clear: both;
+	text-align: left;
+	text-indent: 0;
+}
+
+#speedy-cart-selector .speedy-cart-heading {
+	margin-bottom: 12px;
+	font-weight: 600;
+	font-size: 14px;
+	color: #333;
+	line-height: 1.4;
+	display: block;
+	text-indent: 0;
+}
+
+#speedy-cart-options {
+	display: block;
+}
+
+.speedy-cart-option {
+	margin-bottom: 8px;
+}
+
+.speedy-cart-option label {
+	cursor: pointer;
+	display: block !important;
+	font-size: 14px !important;
+	line-height: 24px !important;
+	font-weight: normal !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	color: #444 !important;
+	text-align: left !important;
+	text-indent: 0 !important;
+}
+
+.speedy-cart-option input[type="radio"] {
+	margin: 0 10px 0 0 !important;
+	width: 18px !important;
+	height: 18px !important;
+	vertical-align: middle !important;
+	display: inline-block !important;
+	position: static !important;
+	float: none !important;
+	appearance: radio !important;
+	-webkit-appearance: radio !important;
+}
+
+.speedy-cart-option span {
+	vertical-align: middle !important;
+	display: inline-block !important;
+}
+
+/* Fade effect while updating */
+#speedy-cart-selector.speedy-updating {
+	opacity: 0.6;
+	pointer-events: none;
+}
+

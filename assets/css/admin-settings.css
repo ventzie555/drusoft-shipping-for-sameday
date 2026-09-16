@@ -1,0 +1,29 @@
+/**
+ * Drusoft Shipping for Speedy - Admin Settings Styles
+ */
+
+.speedy-settings-group {
+    border: 1px solid #ccc;
+    padding: 15px;
+    margin-bottom: 15px;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.speedy-settings-group > label:first-of-type {
+    font-weight: bold;
+    color: #23282d;
+    display: block;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+}
+
+/* Ensure fieldsets inside the group have some spacing */
+.speedy-settings-group fieldset {
+    margin-bottom: 10px;
+}
+
+/* Hide the last margin */
+.speedy-settings-group fieldset:last-child {
+    margin-bottom: 0;
+}
