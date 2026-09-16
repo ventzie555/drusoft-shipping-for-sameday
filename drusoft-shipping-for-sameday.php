@@ -940,24 +940,30 @@ function drushfs_search_offices(): void {
 		wp_send_json_success( [] );
 	}
 
-	// Use the static method from the shipping class which handles DB check + API fallback
+	// Pickup locations come from the local table the daily sync fills, so the
+	// picker never waits on Sameday.
 	if ( class_exists( 'Drushfs_Shipping_Method' ) ) {
-		$exclude_automats = isset( $_GET['exclude_automats'] ) && '1' === $_GET['exclude_automats'];
-		$offices = Drushfs_Shipping_Method::get_speedy_offices( null, null, $term, $exclude_automats );
-		
+		$only_easybox = isset( $_GET['only_easybox'] ) && '1' === $_GET['only_easybox'];
+		$points       = Drushfs_Shipping_Method::get_points( $term, $only_easybox );
+
 		$results = [];
-		if ( ! empty( $offices ) ) {
-			foreach ( $offices as $id => $label ) {
-				// Skip the default placeholder if present
-				if ( $id == 0 ) continue;
-				
-				$results[] = [
-					'id'   => $id,
-					'text' => $label
-				];
+		foreach ( $points as $point ) {
+			$id = (int) ( $point['ooh_id'] ?? 0 );
+			if ( ! $id ) {
+				continue;
 			}
+
+			$results[] = [
+				'id'   => $id,
+				'text' => sprintf(
+					'%s, %s — %s',
+					$point['name'] ?? '',
+					$point['city'] ?? '',
+					$point['address'] ?? ''
+				),
+			];
 		}
-		
+
 		wp_send_json( [ 'results' => $results ] );
 	} else {
 		wp_send_json_error( __( 'Shipping method class not found.', 'drusoft-shipping-for-sameday' ) );

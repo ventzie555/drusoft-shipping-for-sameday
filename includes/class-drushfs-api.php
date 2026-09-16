@@ -313,6 +313,13 @@ class Drushfs_Api {
 			'/api/client/ooh-locations',
 			array(
 				'countryCode'  => $country,
+				// Without listingType the endpoint answers easybox only
+				// (oohType 0). With it, SAMEDAY point / PUDO (oohType 1) is
+				// included too, so the picker fills in by itself the day
+				// Sameday opens real PUDO points in Bulgaria — on 16.09.2026
+				// the only two in the list were demo rows with Romanian
+				// addresses.
+				'listingType'  => 1,
 				'page'         => $page,
 				'countPerPage' => $per,
 			)
