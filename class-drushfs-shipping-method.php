@@ -164,6 +164,14 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 					'description' => __( 'Off: create each waybill by hand from the order screen. An order that already has a waybill is never given a second one.', 'drusoft-shipping-for-sameday' ),
 					'desc_tip'    => true,
 				),
+				'open_before_pay'  => array(
+					'title'       => __( 'Open before paying', 'drusoft-shipping-for-sameday' ),
+					'type'        => 'checkbox',
+					'label'       => __( 'Let the recipient open the parcel before paying', 'drusoft-shipping-for-sameday' ),
+					'default'     => 'no',
+					'description' => __( 'Sameday\'s „Отвори преди да платиш“ extra, added to every waybill for delivery to an address. It does not exist for easybox and SAMEDAY point deliveries, and is skipped when your account does not have it.', 'drusoft-shipping-for-sameday' ),
+					'desc_tip'    => true,
+				),
 				'parcel_title'     => array(
 					'title' => __( 'Parcel', 'drusoft-shipping-for-sameday' ),
 					'type'  => 'title',
@@ -580,7 +588,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 
 			$cache_key = 'drushfs_q_' . md5(
 				wp_json_encode(
-					array( $type, $city, $destination['postcode'] ?? '', $weight, $cod, $value, $creds['sameday_env'] ?? '' )
+					array( $type, $city, $destination['postcode'] ?? '', $weight, $cod, $value, $creds['sameday_env'] ?? '', $this->get_option( 'open_before_pay', 'no' ) )
 				)
 			);
 
@@ -704,6 +712,13 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 					array( 'weight' => max( 0.1, $weight ) ),
 				),
 			);
+
+			if ( 'address' === $type && 'yes' === $this->get_option( 'open_before_pay', 'no' ) ) {
+				$tax = Drushfs_Api::optional_tax_id( $creds, (int) $service, 'OPCG', 0 );
+				if ( $tax ) {
+					$payload['serviceTaxes'] = array( $tax );
+				}
+			}
 
 			// A quote for a locker needs a locker: use the customer's choice
 			// when they have made one, otherwise any visible point in their

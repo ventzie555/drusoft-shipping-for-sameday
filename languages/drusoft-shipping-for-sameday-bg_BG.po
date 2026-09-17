@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: Drusoft Shipping for Sameday 0.1.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/drusoft-shipping-"
 "for-sameday\n"
-"POT-Creation-Date: 2026-09-17T14:32:37+00:00\n"
+"POT-Creation-Date: 2026-09-17T16:35:52+00:00\n"
 "PO-Revision-Date: 2023-10-27 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: Bulgarian\n"
@@ -112,7 +112,7 @@ msgstr "Локации"
 msgid "Sender"
 msgstr "Подател"
 
-#: class-drushfs-shipping-method.php:125 class-drushfs-shipping-method.php:310
+#: class-drushfs-shipping-method.php:125 class-drushfs-shipping-method.php:318
 msgid "Pickup point"
 msgstr "Пикъп точка"
 
@@ -125,7 +125,7 @@ msgstr ""
 msgid "Delivery options"
 msgstr "Начини на доставка"
 
-#: class-drushfs-shipping-method.php:136 class-drushfs-shipping-method.php:207
+#: class-drushfs-shipping-method.php:136 class-drushfs-shipping-method.php:215
 #: drusoft-shipping-for-sameday.php:528
 msgid "To an address"
 msgstr "До адрес"
@@ -134,7 +134,7 @@ msgstr "До адрес"
 msgid "Offer delivery to the customer's address (24H)"
 msgstr "Предлагай доставка до адреса на клиента (24H)"
 
-#: class-drushfs-shipping-method.php:142 class-drushfs-shipping-method.php:214
+#: class-drushfs-shipping-method.php:142 class-drushfs-shipping-method.php:222
 #: drusoft-shipping-for-sameday.php:529
 msgid "To an easybox"
 msgstr "До easybox"
@@ -143,7 +143,7 @@ msgstr "До easybox"
 msgid "Offer delivery to an easybox locker (Locker NextDay)"
 msgstr "Предлагай доставка до автомат easybox (Locker NextDay)"
 
-#: class-drushfs-shipping-method.php:148 class-drushfs-shipping-method.php:221
+#: class-drushfs-shipping-method.php:148 class-drushfs-shipping-method.php:229
 #: drusoft-shipping-for-sameday.php:530
 msgid "To a SAMEDAY point"
 msgstr "До SAMEDAY point"
@@ -183,34 +183,52 @@ msgstr ""
 "Поръчка, която вече има товарителница, никога не получава втора."
 
 #: class-drushfs-shipping-method.php:168
+msgid "Open before paying"
+msgstr "Отвори преди да платиш"
+
+#: class-drushfs-shipping-method.php:170
+msgid "Let the recipient open the parcel before paying"
+msgstr "Получателят може да отвори пратката, преди да плати"
+
+#: class-drushfs-shipping-method.php:172
+msgid ""
+"Sameday's „Отвори преди да платиш“ extra, added to every waybill for "
+"delivery to an address. It does not exist for easybox and SAMEDAY point "
+"deliveries, and is skipped when your account does not have it."
+msgstr ""
+"Допълнителната услуга „Отвори преди да платиш“ на Sameday, добавяна към "
+"всяка товарителница за доставка до адрес. Не съществува за доставки до "
+"easybox и SAMEDAY point и се пропуска, ако профилът ви я няма."
+
+#: class-drushfs-shipping-method.php:176
 msgid "Parcel"
 msgstr "Пратка"
 
-#: class-drushfs-shipping-method.php:172
+#: class-drushfs-shipping-method.php:180
 msgid "Default weight (kg)"
 msgstr "Тегло по подразбиране (кг)"
 
-#: class-drushfs-shipping-method.php:180
+#: class-drushfs-shipping-method.php:188
 msgid "Used when a product carries no weight."
 msgstr "Използва се, когато продуктът няма зададено тегло."
 
-#: class-drushfs-shipping-method.php:184
+#: class-drushfs-shipping-method.php:192
 msgid "Declared value"
 msgstr "Обявена стойност"
 
-#: class-drushfs-shipping-method.php:187
+#: class-drushfs-shipping-method.php:195
 msgid "Never declare a value"
 msgstr "Без обявена стойност"
 
-#: class-drushfs-shipping-method.php:188
+#: class-drushfs-shipping-method.php:196
 msgid "Declare above a threshold"
 msgstr "Обявявай над праг"
 
-#: class-drushfs-shipping-method.php:189
+#: class-drushfs-shipping-method.php:197
 msgid "Always declare the order value"
 msgstr "Винаги обявявай стойността на поръчката"
 
-#: class-drushfs-shipping-method.php:192
+#: class-drushfs-shipping-method.php:200
 msgid ""
 "Insurance costs 0.5% of the declared value. Without it Sameday's liability "
 "is capped low."
@@ -218,15 +236,15 @@ msgstr ""
 "Застраховката струва 0,5% от обявената стойност. Без нея отговорността на "
 "Sameday е ограничена до ниска сума."
 
-#: class-drushfs-shipping-method.php:196
+#: class-drushfs-shipping-method.php:204
 msgid "Declare from (order total)"
 msgstr "Обявявай от (сума на поръчката)"
 
-#: class-drushfs-shipping-method.php:202
+#: class-drushfs-shipping-method.php:210
 msgid "Fallback prices"
 msgstr "Резервни цени"
 
-#: class-drushfs-shipping-method.php:204
+#: class-drushfs-shipping-method.php:212
 msgid ""
 "Used only when Sameday cannot be reached, so checkout still shows a price. "
 "Enter what the contract charges, including any surcharges."
@@ -234,15 +252,15 @@ msgstr ""
 "Използват се само когато Sameday не отговаря, за да има цена при поръчка. "
 "Въведете цените по договора, включително надбавките."
 
-#: class-drushfs-shipping-method.php:228
+#: class-drushfs-shipping-method.php:236
 msgid "Per extra kg"
 msgstr "За всеки допълнителен кг"
 
-#: class-drushfs-shipping-method.php:233
+#: class-drushfs-shipping-method.php:241
 msgid "Added for every kilogram above three."
 msgstr "Добавя се за всеки килограм над три."
 
-#: class-drushfs-shipping-method.php:256
+#: class-drushfs-shipping-method.php:264
 msgid ""
 "Locations have never been refreshed yet. They arrive once credentials are "
 "saved."
@@ -251,49 +269,49 @@ msgstr ""
 "достъп."
 
 #. translators: 1: date and time, 2: age such as "3 hours", 3: locker count, 4: city count
-#: class-drushfs-shipping-method.php:266
+#: class-drushfs-shipping-method.php:274
 #, php-format
 msgid "Last refreshed %1$s (%2$s ago): %3$d pickup locations, %4$d cities."
 msgstr ""
 "Последно обновяване %1$s (преди %2$s): %3$d места за получаване, %4$d "
 "населени места."
 
-#: class-drushfs-shipping-method.php:274
+#: class-drushfs-shipping-method.php:282
 msgid "That is more than three days — the daily refresh may not be running."
 msgstr ""
 "Това е преди повече от три дни — ежедневното обновяване може да не работи."
 
-#: class-drushfs-shipping-method.php:288
+#: class-drushfs-shipping-method.php:296
 msgid "Save your credentials first"
 msgstr "Първо запишете данните за достъп"
 
-#: class-drushfs-shipping-method.php:320
+#: class-drushfs-shipping-method.php:328
 msgid "Sameday returned no pickup points"
 msgstr "Sameday не върна пикъп точки"
 
 #. translators: %s: error message from Sameday.
-#: class-drushfs-shipping-method.php:363
+#: class-drushfs-shipping-method.php:371
 #, php-format
 msgid "Sameday rejected these credentials: %s"
 msgstr "Sameday отхвърли данните за достъп: %s"
 
-#: class-drushfs-shipping-method.php:370
+#: class-drushfs-shipping-method.php:378
 msgid "Sameday credentials accepted."
 msgstr "Данните за достъп до Sameday са приети."
 
-#: class-drushfs-shipping-method.php:528
+#: class-drushfs-shipping-method.php:536
 msgid "Sameday — to an address"
 msgstr "Sameday — до адрес"
 
-#: class-drushfs-shipping-method.php:532
+#: class-drushfs-shipping-method.php:540
 msgid "Sameday — to an easybox"
 msgstr "Sameday — до easybox"
 
-#: class-drushfs-shipping-method.php:536
+#: class-drushfs-shipping-method.php:544
 msgid "Sameday — to a SAMEDAY point"
 msgstr "Sameday — до SAMEDAY point"
 
-#: class-drushfs-shipping-method.php:688
+#: class-drushfs-shipping-method.php:696
 msgid "Recipient"
 msgstr "Получател"
 
@@ -443,15 +461,15 @@ msgstr "Липсва код на регион"
 msgid "Unknown region code"
 msgstr "Непознат код на регион"
 
-#: drusoft-shipping-for-sameday.php:1322 drusoft-shipping-for-sameday.php:1340
+#: drusoft-shipping-for-sameday.php:1322
 msgid "Missing city"
 msgstr "Липсва град"
 
-#: drusoft-shipping-for-sameday.php:1432
+#: drusoft-shipping-for-sameday.php:1441
 msgid "Please choose a SAMEDAY point."
 msgstr "Моля, изберете SAMEDAY point."
 
-#: drusoft-shipping-for-sameday.php:1433
+#: drusoft-shipping-for-sameday.php:1442
 msgid "Please choose an easybox."
 msgstr "Моля, изберете easybox."
 
@@ -640,10 +658,18 @@ msgstr "Sameday не върна номер на товарителница."
 msgid "Sameday waybill created: %1$s (%2$s)."
 msgstr "Създадена товарителница в Sameday: %1$s (%2$s)."
 
-#: includes/class-drushfs-waybill-generator.php:147
+#: includes/class-drushfs-waybill-generator.php:151
 msgid "No Sameday pickup point is configured."
 msgstr "Не е настроена пикъп точка на Sameday."
 
-#: includes/class-drushfs-waybill-generator.php:210
+#: includes/class-drushfs-waybill-generator.php:215
+msgid ""
+"Sameday: “open before paying” is switched on, but this account does not "
+"offer it for delivery to an address. The waybill was created without it."
+msgstr ""
+"Sameday: „Отвори преди да платиш“ е включено, но този профил не го предлага "
+"за доставка до адрес. Товарителницата е създадена без него."
+
+#: includes/class-drushfs-waybill-generator.php:224
 msgid "This order is set for locker delivery but carries no locker choice."
 msgstr "Поръчката е за доставка до автомат, но няма избран автомат."

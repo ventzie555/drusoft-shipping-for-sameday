@@ -323,6 +323,41 @@ class Drushfs_Api {
 	}
 
 	/**
+	 * Id of an optional extra ("service tax") of a service, by its tax code.
+	 *
+	 * Ids differ per environment, per service and per package type (OPCG on
+	 * 24H is 189336 on production and 61988 on demo for a standard package),
+	 * while the tax code is stable. Cached for a day per account.
+	 *
+	 * @param array  $creds        Credentials.
+	 * @param int    $service_id   Service id.
+	 * @param string $tax_code     e.g. 'OPCG' — open the parcel before paying.
+	 * @param int    $package_type 0 package, 1 envelope, 2 large.
+	 * @return int 0 when the account does not have that extra on that service.
+	 */
+	public static function optional_tax_id( array $creds, int $service_id, string $tax_code, int $package_type = 0 ): int {
+		$key = 'drushfs_service_taxes_' . md5( ( $creds['sameday_username'] ?? '' ) . '|' . self::host( $creds ) );
+		$map = get_transient( $key );
+
+		if ( ! is_array( $map ) ) {
+			$map      = array();
+			$response = self::services( $creds );
+			if ( ! is_wp_error( $response ) ) {
+				foreach ( (array) ( $response['data'] ?? array() ) as $service ) {
+					foreach ( (array) ( $service['serviceOptionalTaxes'] ?? array() ) as $tax ) {
+						if ( isset( $service['id'], $tax['taxCode'], $tax['id'] ) ) {
+							$map[ (int) $service['id'] ][ (string) $tax['taxCode'] ][ (int) ( $tax['packageType'] ?? 0 ) ] = (int) $tax['id'];
+						}
+					}
+				}
+			}
+			set_transient( $key, $map, $map ? DAY_IN_SECONDS : 10 * MINUTE_IN_SECONDS );
+		}
+
+		return (int) ( $map[ $service_id ][ $tax_code ][ $package_type ] ?? 0 );
+	}
+
+	/**
 	 * Our own warehouses; the pickup point id is required on every shipment.
 	 *
 	 * @param array $creds Credentials.

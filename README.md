@@ -31,6 +31,7 @@ Sibling plugins with the same checkout experience: [Drusoft Shipping for Speedy]
 - **Waybills** — create (manually or automatically), print PDF labels, cancel
 - **Cash on delivery** always taken from the order total at waybill time
 - **Declared value** — off, above a threshold, or always
+- **Open before paying** — Sameday's „Отвори преди да платиш“ extra on address deliveries, as a setting
 - **Demo / production** environment switch
 - **Bulgarian (bg_BG) translation** included
 

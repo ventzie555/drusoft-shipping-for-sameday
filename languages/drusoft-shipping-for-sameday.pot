@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Drusoft Shipping for Sameday 0.3.2\n"
+"Project-Id-Version: Drusoft Shipping for Sameday 0.5.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/drusoft-shipping-for-sameday\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-17T14:32:37+00:00\n"
+"POT-Creation-Date: 2026-09-17T16:35:52+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: drusoft-shipping-for-sameday\n"
@@ -106,7 +106,7 @@ msgid "Sender"
 msgstr ""
 
 #: class-drushfs-shipping-method.php:125
-#: class-drushfs-shipping-method.php:310
+#: class-drushfs-shipping-method.php:318
 msgid "Pickup point"
 msgstr ""
 
@@ -119,7 +119,7 @@ msgid "Delivery options"
 msgstr ""
 
 #: class-drushfs-shipping-method.php:136
-#: class-drushfs-shipping-method.php:207
+#: class-drushfs-shipping-method.php:215
 #: drusoft-shipping-for-sameday.php:528
 msgid "To an address"
 msgstr ""
@@ -129,7 +129,7 @@ msgid "Offer delivery to the customer's address (24H)"
 msgstr ""
 
 #: class-drushfs-shipping-method.php:142
-#: class-drushfs-shipping-method.php:214
+#: class-drushfs-shipping-method.php:222
 #: drusoft-shipping-for-sameday.php:529
 msgid "To an easybox"
 msgstr ""
@@ -139,7 +139,7 @@ msgid "Offer delivery to an easybox locker (Locker NextDay)"
 msgstr ""
 
 #: class-drushfs-shipping-method.php:148
-#: class-drushfs-shipping-method.php:221
+#: class-drushfs-shipping-method.php:229
 #: drusoft-shipping-for-sameday.php:530
 msgid "To a SAMEDAY point"
 msgstr ""
@@ -169,102 +169,114 @@ msgid "Off: create each waybill by hand from the order screen. An order that alr
 msgstr ""
 
 #: class-drushfs-shipping-method.php:168
-msgid "Parcel"
+msgid "Open before paying"
+msgstr ""
+
+#: class-drushfs-shipping-method.php:170
+msgid "Let the recipient open the parcel before paying"
 msgstr ""
 
 #: class-drushfs-shipping-method.php:172
-msgid "Default weight (kg)"
+msgid "Sameday's „Отвори преди да платиш“ extra, added to every waybill for delivery to an address. It does not exist for easybox and SAMEDAY point deliveries, and is skipped when your account does not have it."
+msgstr ""
+
+#: class-drushfs-shipping-method.php:176
+msgid "Parcel"
 msgstr ""
 
 #: class-drushfs-shipping-method.php:180
-msgid "Used when a product carries no weight."
-msgstr ""
-
-#: class-drushfs-shipping-method.php:184
-msgid "Declared value"
-msgstr ""
-
-#: class-drushfs-shipping-method.php:187
-msgid "Never declare a value"
+msgid "Default weight (kg)"
 msgstr ""
 
 #: class-drushfs-shipping-method.php:188
-msgid "Declare above a threshold"
-msgstr ""
-
-#: class-drushfs-shipping-method.php:189
-msgid "Always declare the order value"
+msgid "Used when a product carries no weight."
 msgstr ""
 
 #: class-drushfs-shipping-method.php:192
-msgid "Insurance costs 0.5% of the declared value. Without it Sameday's liability is capped low."
+msgid "Declared value"
+msgstr ""
+
+#: class-drushfs-shipping-method.php:195
+msgid "Never declare a value"
 msgstr ""
 
 #: class-drushfs-shipping-method.php:196
-msgid "Declare from (order total)"
+msgid "Declare above a threshold"
 msgstr ""
 
-#: class-drushfs-shipping-method.php:202
-msgid "Fallback prices"
+#: class-drushfs-shipping-method.php:197
+msgid "Always declare the order value"
+msgstr ""
+
+#: class-drushfs-shipping-method.php:200
+msgid "Insurance costs 0.5% of the declared value. Without it Sameday's liability is capped low."
 msgstr ""
 
 #: class-drushfs-shipping-method.php:204
+msgid "Declare from (order total)"
+msgstr ""
+
+#: class-drushfs-shipping-method.php:210
+msgid "Fallback prices"
+msgstr ""
+
+#: class-drushfs-shipping-method.php:212
 msgid "Used only when Sameday cannot be reached, so checkout still shows a price. Enter what the contract charges, including any surcharges."
 msgstr ""
 
-#: class-drushfs-shipping-method.php:228
+#: class-drushfs-shipping-method.php:236
 msgid "Per extra kg"
 msgstr ""
 
-#: class-drushfs-shipping-method.php:233
+#: class-drushfs-shipping-method.php:241
 msgid "Added for every kilogram above three."
 msgstr ""
 
-#: class-drushfs-shipping-method.php:256
+#: class-drushfs-shipping-method.php:264
 msgid "Locations have never been refreshed yet. They arrive once credentials are saved."
 msgstr ""
 
 #. translators: 1: date and time, 2: age such as "3 hours", 3: locker count, 4: city count
-#: class-drushfs-shipping-method.php:266
+#: class-drushfs-shipping-method.php:274
 #, php-format
 msgid "Last refreshed %1$s (%2$s ago): %3$d pickup locations, %4$d cities."
 msgstr ""
 
-#: class-drushfs-shipping-method.php:274
+#: class-drushfs-shipping-method.php:282
 msgid "That is more than three days — the daily refresh may not be running."
 msgstr ""
 
-#: class-drushfs-shipping-method.php:288
+#: class-drushfs-shipping-method.php:296
 msgid "Save your credentials first"
 msgstr ""
 
-#: class-drushfs-shipping-method.php:320
+#: class-drushfs-shipping-method.php:328
 msgid "Sameday returned no pickup points"
 msgstr ""
 
 #. translators: %s: error message from Sameday.
-#: class-drushfs-shipping-method.php:363
+#: class-drushfs-shipping-method.php:371
 #, php-format
 msgid "Sameday rejected these credentials: %s"
 msgstr ""
 
-#: class-drushfs-shipping-method.php:370
+#: class-drushfs-shipping-method.php:378
 msgid "Sameday credentials accepted."
 msgstr ""
 
-#: class-drushfs-shipping-method.php:528
+#: class-drushfs-shipping-method.php:536
 msgid "Sameday — to an address"
 msgstr ""
 
-#: class-drushfs-shipping-method.php:532
+#: class-drushfs-shipping-method.php:540
 msgid "Sameday — to an easybox"
 msgstr ""
 
-#: class-drushfs-shipping-method.php:536
+#: class-drushfs-shipping-method.php:544
 msgid "Sameday — to a SAMEDAY point"
 msgstr ""
 
-#: class-drushfs-shipping-method.php:688
+#: class-drushfs-shipping-method.php:696
 msgid "Recipient"
 msgstr ""
 
@@ -413,15 +425,14 @@ msgid "Unknown region code"
 msgstr ""
 
 #: drusoft-shipping-for-sameday.php:1322
-#: drusoft-shipping-for-sameday.php:1340
 msgid "Missing city"
 msgstr ""
 
-#: drusoft-shipping-for-sameday.php:1432
+#: drusoft-shipping-for-sameday.php:1441
 msgid "Please choose a SAMEDAY point."
 msgstr ""
 
-#: drusoft-shipping-for-sameday.php:1433
+#: drusoft-shipping-for-sameday.php:1442
 msgid "Please choose an easybox."
 msgstr ""
 
@@ -610,10 +621,14 @@ msgstr ""
 msgid "Sameday waybill created: %1$s (%2$s)."
 msgstr ""
 
-#: includes/class-drushfs-waybill-generator.php:147
+#: includes/class-drushfs-waybill-generator.php:151
 msgid "No Sameday pickup point is configured."
 msgstr ""
 
-#: includes/class-drushfs-waybill-generator.php:210
+#: includes/class-drushfs-waybill-generator.php:215
+msgid "Sameday: “open before paying” is switched on, but this account does not offer it for delivery to an address. The waybill was created without it."
+msgstr ""
+
+#: includes/class-drushfs-waybill-generator.php:224
 msgid "This order is set for locker delivery but carries no locker choice."
 msgstr ""

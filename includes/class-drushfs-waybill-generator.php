@@ -206,6 +206,16 @@ if ( ! class_exists( 'Drushfs_Waybill_Generator' ) ) {
 				),
 			);
 
+			// „Отвори преди да платиш“ exists only on delivery to an address.
+			if ( 'address' === $type && 'yes' === ( $settings['open_before_pay'] ?? 'no' ) ) {
+				$tax = Drushfs_Api::optional_tax_id( $creds, (int) $service, 'OPCG', 0 );
+				if ( $tax ) {
+					$payload['serviceTaxes'] = array( $tax );
+				} else {
+					$order->add_order_note( __( 'Sameday: “open before paying” is switched on, but this account does not offer it for delivery to an address. The waybill was created without it.', 'drusoft-shipping-for-sameday' ) );
+				}
+			}
+
 			if ( in_array( $type, array( 'easybox', 'pudo' ), true ) ) {
 				$ooh = (int) $order->get_meta( '_drushfs_office_id' );
 				if ( ! $ooh ) {
