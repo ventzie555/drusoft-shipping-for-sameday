@@ -80,6 +80,10 @@ Each pickup option appears only when the customer's city has such a location. A 
 
 Yes. Enable **Create automatically** in the shipping method settings. A waybill is created when an order becomes "Processing" or "On hold"; an order that already has one is never given a second.
 
+= The browser console shows a 404 for “…/undefinedwc/store/v1/cart” on the cart page. Is that this plugin? =
+
+No. That request is made by WooCommerce's own Mini-Cart block (the cart icon in the header of block themes such as Twenty Twenty-Five) when the cart itself is the classic shortcode page this plugin requires. WooCommerce builds the address from a value that is not set on that page, so it starts with the word “undefined”. It appears with every shipping plugin switched off as well, and it does not affect prices, delivery options or orders — only the header icon's item count may lag until the next page load.
+
 = Can I request a courier from WordPress? =
 
 No. Sameday's client API has no courier-request endpoint. Collection follows your pickup point arrangement with Sameday, or you drop parcels into an easybox.
