@@ -32,13 +32,13 @@
 }
 
 /* Ensure radio buttons are aligned nicely */
-#sameday-delivery-type-field label {
+#sameday-delivery-type-wrapper label {
     font-weight: normal;
     margin-right: 15px;
     cursor: pointer;
 }
 
-#sameday-delivery-type-field input[type="radio"] {
+#sameday-delivery-type-wrapper input[type="radio"] {
     margin-right: 5px;
     vertical-align: middle;
 }

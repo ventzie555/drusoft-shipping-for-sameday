@@ -84,16 +84,25 @@ jQuery(function ($) {
             return;
         }
 
+        // Same markup as Speedy and Econt — input and label as siblings inside
+        // a *-delivery-type-wrapper — so a store's styling for one courier's
+        // radios (druoutlet's theme lays them out as a two-column grid with
+        // 18 px accent radios) applies to all three. The first version nested
+        // the input inside its label and got the browser's 13 px default.
+        var radio = function (value, text, extraClass) {
+            var id = 'sameday_delivery_type_' + value;
+            var cls = extraClass ? ' class="' + extraClass + '"' : '';
+            return '<input type="radio" name="sameday_delivery_type" id="' + id + '" value="' + value + '"' + cls + '>' +
+                '<label for="' + id + '"' + cls + '>' + text + '</label>';
+        };
+
         var html =
             '<p class="form-row form-row-wide" id="sameday-delivery-type-field">' +
             '<label>' + params.i18n.delivery_method + '</label>' +
-            '<span class="sameday-delivery-options">' +
-            '<label><input type="radio" name="sameday_delivery_type" value="address"> ' +
-            params.i18n.to_address + '</label>' +
-            '<label><input type="radio" name="sameday_delivery_type" value="easybox"> ' +
-            params.i18n.to_easybox + '</label>' +
-            '<label class="sameday-pudo-option"><input type="radio" name="sameday_delivery_type" value="pudo"> ' +
-            params.i18n.to_pudo + '</label>' +
+            '<span class="woocommerce-input-wrapper" id="sameday-delivery-type-wrapper">' +
+            radio('address', params.i18n.to_address) +
+            radio('easybox', params.i18n.to_easybox) +
+            radio('pudo', params.i18n.to_pudo, 'sameday-pudo-option') +
             '</span></p>' +
             '<p class="form-row form-row-wide" id="sameday-point-field" style="display:none;">' +
             '<label for="sameday_point_select" id="sameday-point-label">' + params.i18n.select_easybox + '</label>' +
