@@ -179,6 +179,10 @@ class Drushfs_Syncer {
 			$response = Drushfs_Api::ooh_locations( $creds, $page, 500 );
 
 			if ( is_wp_error( $response ) ) {
+				// Past the last page Sameday answers an error, not an empty list.
+				if ( $page > 1 && $rows ) {
+					break;
+				}
 				self::log( 'error', 'Sameday lockers sync: ' . $response->get_error_message() );
 				return false;
 			}
@@ -213,11 +217,13 @@ class Drushfs_Syncer {
 				);
 			}
 
+			// Follow the page count Sameday reports. A short page is NOT the last
+			// one: production answers 500, 499, 497, 226 for its 1,722 locations,
+			// and stopping at the first short page silently dropped 723 of them
+			// (found 17.09.2026 — every easybox arrived, most SAMEDAY points did
+			// not). Without a page count, carry on until a page comes back empty.
 			$pages = (int) ( $response['pages'] ?? 0 );
-			$per   = (int) ( $response['perPage'] ?? 0 );
-			// Their "pages" counts records when perPage is honoured oddly, so
-			// stop on a short page rather than trusting the number.
-			if ( count( $data ) < 500 || ( $pages && $per && $page >= $pages ) ) {
+			if ( $pages && $page >= $pages ) {
 				break;
 			}
 		}

@@ -3,7 +3,7 @@ Contributors: ventzie
 Tags: woocommerce, shipping, sameday, easybox, bulgaria
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 0.4.0
+Stable tag: 0.4.1
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -157,6 +157,9 @@ This plugin communicates with one host per environment:
 * **Map data** — The pickup list is loaded per city; the map's country-wide list is fetched only when the customer opens the map and is cached for an hour.
 
 == Changelog ==
+
+= 0.4.1 =
+* Location sync: follow the page count Sameday reports. A page can come back short without being the last one, and the sync stopped there, dropping most SAMEDAY points on accounts with more than a thousand locations.
 
 = 0.4.0 =
 * Map: shows the whole country and opens zoomed on the chosen city, as Drusoft Shipping for Econt does; a location picked in another city switches region, city and delivery type. The map button is available as soon as Sameday is selected.
