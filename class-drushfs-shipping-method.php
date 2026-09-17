@@ -406,6 +406,37 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 				return;
 			}
 
+			// No price without a city, exactly as Speedy and Econt behave: the
+			// method stays selectable and the label carries no amount.
+			$city = $this->resolve_city( $package );
+			if ( ! $city ) {
+				$this->add_rate(
+					array(
+						'id'        => $this->get_rate_id(),
+						'label'     => $this->title,
+						'cost'      => 0,
+						'package'   => $package,
+						'meta_data' => array( 'missing_address' => true ),
+					)
+				);
+				return;
+			}
+			$package['destination']['city']     = $city['name'];
+			$package['destination']['postcode'] = $city['postal_code'];
+			$package['sameday_city']            = $city;
+
+			// A locker type only makes sense in a city that has such a point.
+			$available = drushfs_check_city_availability( (int) $city['id'] );
+			if ( ! $available['has_easybox'] ) {
+				unset( $enabled['easybox'] );
+			}
+			if ( ! $available['has_pudo'] ) {
+				unset( $enabled['pudo'] );
+			}
+			if ( ! $enabled ) {
+				return;
+			}
+
 			$type = $this->chosen_type( $package, array_keys( $enabled ) );
 
 			// A point picked in the form travels in the package; make it the
@@ -451,6 +482,22 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 		 * @param array $allowed Enabled type keys.
 		 * @return string
 		 */
+		/**
+		 * The city the customer picked from our list.
+		 *
+		 * @param array $package WooCommerce package.
+		 * @return array|null Row of the cities table.
+		 */
+		private function resolve_city( array $package ): ?array {
+			$city_id = absint( $package['sameday_city_id'] ?? 0 );
+
+			if ( ! $city_id && WC()->session ) {
+				$city_id = absint( WC()->session->get( 'drushfs_city_id', 0 ) );
+			}
+
+			return function_exists( 'drushfs_city_row' ) ? drushfs_city_row( $city_id ) : null;
+		}
+
 		private function chosen_type( array $package, array $allowed ): string {
 			$candidates = array(
 				(string) ( $package['sameday_delivery_type'] ?? '' ),
@@ -632,8 +679,12 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 					'email'        => 'noreply@example.com',
 					'personType'   => 0,
 					'cityString'   => $city,
-					'countyString' => $this->county_for_city( $city, (string) ( $destination['state'] ?? '' ) ),
-					'address'      => trim( (string) ( $destination['address_1'] ?? '' ) . ' ' . (string) ( $destination['address_2'] ?? '' ) ) ?: '-',
+					'countyString' => (string) ( $package['sameday_city']['county'] ?? '' ) ?: $this->county_for_city( $city, (string) ( $destination['state'] ?? '' ) ),
+					// Sameday refuses an address under three characters, and the
+					// price does not depend on the street: before the customer
+					// has typed one, the city stands in so the quote still
+					// comes from the API rather than the fallback table.
+					'address'      => $this->quotable_address( $destination, $city ),
 					'postalCode'   => (string) ( $destination['postcode'] ?? '' ),
 				),
 				'parcels'          => array(
@@ -645,7 +696,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			// when they have made one, otherwise any visible point in their
 			// city, because the price is the same across a city.
 			if ( in_array( $type, array( 'easybox', 'pudo' ), true ) ) {
-				$ooh = $this->resolve_point( $type, $city );
+				$ooh = $this->resolve_point( $type, (int) ( $package['sameday_city']['id'] ?? 0 ) );
 				if ( ! $ooh ) {
 					return array();
 				}
@@ -653,6 +704,19 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			}
 
 			return $payload;
+		}
+
+		/**
+		 * A street Sameday will accept for a quote.
+		 *
+		 * @param array  $destination Package destination.
+		 * @param string $city        City name.
+		 * @return string
+		 */
+		private function quotable_address( array $destination, string $city ): string {
+			$address = trim( (string) ( $destination['address_1'] ?? '' ) . ' ' . (string) ( $destination['address_2'] ?? '' ) );
+
+			return ( mb_strlen( $address ) >= 3 ) ? $address : $city;
 		}
 
 		/**
@@ -679,27 +743,40 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 		/**
 		 * The locker or SAMEDAY point to quote for.
 		 *
-		 * @param string $type Delivery type.
-		 * @param string $city City name.
+		 * @param string $type    Delivery type.
+		 * @param int    $city_id Sameday city id.
 		 * @return int oohId, or 0 when the city has none.
 		 */
-		private function resolve_point( string $type, string $city ): int {
-			$chosen = WC()->session ? absint( WC()->session->get( 'drushfs_office_id', 0 ) ) : 0;
-			if ( $chosen ) {
-				return $chosen;
-			}
-
+		private function resolve_point( string $type, int $city_id ): int {
 			global $wpdb;
 			$ooh_type = ( 'pudo' === $type ) ? self::OOH_PUDO : self::OOH_EASYBOX;
+
+			// The customer's own choice, as long as it is in the city being
+			// priced — a point left over from another city must not leak in.
+			$chosen = WC()->session ? absint( WC()->session->get( 'drushfs_office_id', 0 ) ) : 0;
+			if ( $chosen ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$ok = $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT ooh_id FROM {$wpdb->prefix}drushfs_lockers WHERE ooh_id = %d AND city_id = %d AND ooh_type = %d",
+						$chosen,
+						$city_id,
+						$ooh_type
+					)
+				);
+				if ( $ok ) {
+					return $chosen;
+				}
+			}
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			return (int) $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT ooh_id FROM {$wpdb->prefix}drushfs_lockers
-					 WHERE ooh_type = %d AND client_visible = 1 AND capacity_exceeded = 0 AND city = %s
+					 WHERE ooh_type = %d AND client_visible = 1 AND capacity_exceeded = 0 AND city_id = %d
 					 ORDER BY occupancy_level ASC LIMIT 1",
 					$ooh_type,
-					$city
+					$city_id
 				)
 			);
 		}

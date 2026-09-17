@@ -1,581 +1,1011 @@
+/* global drushfs_params */
+// noinspection CssInvalidHtmlTagReference
+
 /**
- * Drusoft Shipping for Sameday — checkout UI.
+ * Sameday checkout.
  *
- * Adds three delivery choices under the city field: to an address, to an
- * easybox, or to a SAMEDAY point. The two pickup options get a searchable
- * dropdown and the same Leaflet map the Speedy and Econt plugins use, so a
- * customer who has met one of our couriers recognises the others.
- *
- * Much smaller than the Speedy version this was forked from, because Sameday
- * addresses a shipment with a plain city name and a county we resolve on the
- * server. There is no province→city cascade, no street database and no service
- * picker to keep in sync.
- *
- * Living beside the siblings:
- *   - window.__drushfActiveCourier says which courier owns the checkout layout.
- *     Whoever takes over sets it; whoever leaves reads it and, if a sibling has
- *     taken over, removes only its own fields instead of restoring the stock
- *     checkout on top of the newcomer's work.
- *   - Our remembered city and point live in OUR cache, never read back from the
- *     shared address fields — those may already hold the sibling's values by
- *     the time we run.
+ * The same flow as the Speedy and Econt siblings, on purpose: region, then a
+ * city list that fills the postcode, then only the delivery options that city
+ * really has, then a pickup list and a map limited to that city. Sameday has no
+ * service chooser and no street nomenclature, so those two parts are absent.
  */
-jQuery(function ($) {
+
+/**
+ * @global drushfs_params
+ * @type {object}
+ * @property {string} ajax_url
+ * @property {string} method_id
+ * @property {Object} i18n
+ * @property {string} i18n.to_address
+ * @property {string} i18n.to_easybox
+ * @property {string} i18n.to_pudo
+ * @property {string} i18n.select_easybox
+ * @property {string} i18n.select_pudo
+ * @property {string} i18n.select_from_map
+ * @property {string} i18n.select_city
+ * @property {string} i18n.alert_select_city
+ */
+
+/**
+ * @typedef {Object} SamedayAvailabilityData
+ * @property {boolean} has_easybox
+ * @property {boolean} has_pudo
+ * @property {Array} easyboxes
+ * @property {Array} pudos
+ */
+
+(function($, params) {
     'use strict';
 
-    if (typeof drushfs_params === 'undefined') {
-        return;
-    }
+    $(document).ready(function() {
+        const samedayMethodId = params.method_id; // 'drushfs_sameday'
+        let isSamedayActive = false;
+        
+        // State persistence across AJAX updates.
+        // Initialize from server params (session data set by cart page).
+        let lastDeliveryType = params.current_type || 'address';
+        let lastOfficeId = params.current_office_id ? String(params.current_office_id) : '';
 
-    var params = drushfs_params;
-    var METHOD = params.method_id || 'drushfs_sameday';
+        // Cache to avoid redundant AJAX calls.
+        let cachedState = '';
+        let cachedCities = null;
+        let cachedCityId = '';
+        let cachedAvailability = null;
 
-    var isActive = false;
-    var settingUp = false;
-    var context = 'billing';
+        // Remembered selection across a temporary switch to the sibling courier.
+        // Populated on deactivate, consumed once on the next setup so the user
+        // gets their province / city / delivery-type / office back when they
+        // switch Sameday → Econt → Sameday.
+        let savedSelection = null;
 
-    // Our own memory. Never read these back from the shared checkout fields.
-    var lastType = params.current_type || 'address';
-    var lastPointId = params.current_office_id ? String(params.current_office_id) : '';
-    var lastPointLabel = '';
-    var lastCity = params.current_city || '';
+        // True while we are inside setupSamedayUI — prevents update_checkout
+        // that our own code triggers from causing a re-entrant loop.
+        let settingUp = false;
 
-    var allPointsCache = null;
-    var allPointsPromise = null;
-    var searchTimer = null;
+        // Current address context ('billing' or 'shipping')
+        let currentContext = 'billing';
 
-    /* ------------------------------------------------------------------
-     * Helpers
-     * --------------------------------------------------------------- */
-
-    function chosenMethod() {
-        var $checked = $('input[name^="shipping_method"]:checked');
-        if ($checked.length) {
-            return String($checked.val() || '');
-        }
-        // A zone with a single method renders a hidden input instead of radios.
-        var $single = $('input[name^="shipping_method"][type="hidden"]');
-        return $single.length ? String($single.val() || '') : '';
-    }
-
-    function isSamedaySelected() {
-        return chosenMethod().indexOf(METHOD) === 0;
-    }
-
-    function updateContext() {
-        context = $('#ship-to-different-address-checkbox').is(':checked') ? 'shipping' : 'billing';
-    }
-
-    function cityValue() {
-        var city = $('#' + context + '_city').val();
-        return city ? String(city).trim() : '';
-    }
-
-    function pointLabel(point) {
-        return point.name + ', ' + point.city + ' — ' + point.address;
-    }
-
-    /* ------------------------------------------------------------------
-     * The delivery-type block
-     * --------------------------------------------------------------- */
-
-    function renderDeliveryOptions() {
-        if ($('#sameday-delivery-type-field').length) {
-            return;
-        }
-
-        // Same markup as Speedy and Econt — input and label as siblings inside
-        // a *-delivery-type-wrapper — so a store's styling for one courier's
-        // radios (druoutlet's theme lays them out as a two-column grid with
-        // 18 px accent radios) applies to all three. The first version nested
-        // the input inside its label and got the browser's 13 px default.
-        var radio = function (value, text, extraClass) {
-            var id = 'sameday_delivery_type_' + value;
-            var cls = extraClass ? ' class="' + extraClass + '"' : '';
-            return '<input type="radio" name="sameday_delivery_type" id="' + id + '" value="' + value + '"' + cls + '>' +
-                '<label for="' + id + '"' + cls + '>' + text + '</label>';
+        // Store original HTML for both contexts to restore later
+        const originals = {
+            billing: {},
+            shipping: {}
         };
 
-        var html =
-            '<p class="form-row form-row-wide" id="sameday-delivery-type-field">' +
-            '<label>' + params.i18n.delivery_method + '</label>' +
-            '<span class="woocommerce-input-wrapper" id="sameday-delivery-type-wrapper">' +
-            radio('address', params.i18n.to_address) +
-            radio('easybox', params.i18n.to_easybox) +
-            radio('pudo', params.i18n.to_pudo, 'sameday-pudo-option') +
-            '</span></p>' +
-            '<p class="form-row form-row-wide" id="sameday-point-field" style="display:none;">' +
-            '<label for="sameday_point_select" id="sameday-point-label">' + params.i18n.select_easybox + '</label>' +
-            '<select id="sameday_point_select" class="sameday-point-select"></select>' +
-            '<input type="hidden" name="sameday_office_id" id="sameday_office_id" value="">' +
-            '</p>';
-
-        $('#' + context + '_city_field').after(html);
-
-        // A shop with no SAMEDAY point in the country should not offer one.
-        if (!params.has_pudo_anywhere) {
-            $('.sameday-pudo-option').hide();
+        // Helper to capture originals
+        function captureOriginals(context) {
+            // Never snapshot a courier-built city select (ours or the sibling
+            // Econt plugin's) as the "stock" field — that would corrupt the
+            // restore. A courier city is always a select2 <select>; the stock
+            // BG city field is a plain text input. Keep the clean snapshot taken
+            // on page load instead.
+            const $city = $('#' + context + '_city');
+            if ($city.is('select') && $city.hasClass('select2-hidden-accessible')) {
+                return;
+            }
+            if ($('#' + context + '_city_field').length) {
+                originals[context].cityHtml = $('#' + context + '_city_field').html();
+                originals[context].address1Html = $('#' + context + '_address_1_field').html();
+                originals[context].address2Html = $('#' + context + '_address_2_field').html();
+                originals[context].stateHtml = $('#' + context + '_state_field').html();
+                
+                // Capture priorities
+                originals[context].priorities = {
+                    state: $('#' + context + '_state_field').attr('data-priority'),
+                    city: $('#' + context + '_city_field').attr('data-priority'),
+                    address1: $('#' + context + '_address_1_field').attr('data-priority'),
+                    address2: $('#' + context + '_address_2_field').attr('data-priority')
+                };
+            }
         }
 
-        $('input[name="sameday_delivery_type"]').on('change', function () {
-            handleTypeChange($(this).val());
+        // Initial capture
+        captureOriginals('billing');
+        captureOriginals('shipping');
+
+        // Listen for shipping method changes — use mousedown in CAPTURE phase
+        // so our DOM cleanup runs before any other plugin's event handlers.
+        document.addEventListener('mousedown', function(e) {
+            const radio = e.target.closest('input[name^="shipping_method"]');
+            if (!radio) return;
+
+            // The radio hasn't changed value yet on mousedown, but we can
+            // check whether the clicked radio is NOT Sameday.
+            const isSameday = radio.value && radio.value.indexOf(samedayMethodId) !== -1;
+            if (!isSameday && isSamedayActive) {
+                deactivateSameday();
+            }
+        }, true);
+
+        // Keyboard and programmatic switches never fire mousedown (arrow keys on
+        // the radio group, assistive tech, scripts). Without this, our city select
+        // lingered in the DOM after such a switch and the sibling courier's
+        // takeover captured it as the "original" field — leaving a stale city list
+        // (with OUR city ids) live under the other courier. Mirror the cleanup on
+        // 'change' in CAPTURE phase so it still runs before other handlers.
+        document.addEventListener('change', function(e) {
+            const radio = e.target.closest('input[name^="shipping_method"]');
+            if (!radio || !radio.checked) return;
+
+            const isSameday = radio.value && radio.value.indexOf(samedayMethodId) !== -1;
+            if (!isSameday && isSamedayActive) {
+                deactivateSameday();
+            }
+        }, true);
+
+        // Capture state BEFORE WC destroys the DOM
+        $(document.body).on('update_checkout', function() {
+            if (isSamedayActive && !settingUp) {
+                const type = $('input[name="sameday_delivery_type"]:checked').val();
+                if (type) lastDeliveryType = type;
+                
+                // Only capture office if the user explicitly selected one
+                // (the change handler sets lastOfficeId directly, so we just
+                // preserve whatever value it already has — don't read from DOM
+                // because select2 may report a stale or auto-selected value).
+
+                // Save current city id from the dropdown
+                const cityVal = $('#' + currentContext + '_city').val();
+                if (cityVal) cachedCityId = cityVal;
+            }
+            // Unbind state handler to prevent WC DOM teardown from triggering it.
+            // Bound directly on the element now, so unbind there (not on body).
+            $('#' + currentContext + '_state, #shipping_state').off('change.sameday');
         });
 
-        $('#sameday_point_select').on('change', function () {
-            var id = $(this).val();
-            var label = $(this).find('option:selected').text();
-            setPoint(id, label);
+        // ===== SINGLE ENTRY POINT: updated_checkout =====
+        // WooCommerce fires this after every checkout AJAX refresh,
+        // including the initial one on page load. This is where we
+        // set up or restore the Sameday UI — never from document.ready.
+        $(document.body).on('updated_checkout', function() {
+            if (settingUp) return; // guard against re-entrance
+
+            updateContext();
+
+            const samedaySelected = isSamedaySelected();
+
+            // ALWAYS rebind the state-change handler when Sameday is the chosen
+            // method. The update_checkout handler above unbinds change.sameday on
+            // every cycle, and the short-circuit below can skip setupSamedayUI
+            // (which is the only other place that rebinds). Without this, changing
+            // the province after the cascade is set leaves change.sameday unbound,
+            // so the city/office never clear or reload for the new province.
+            if ( samedaySelected && isSamedayActive ) {
+                bindStateChangeHandler();
+            }
+
+            if (!samedaySelected) {
+                if (!isSamedayActive) {
+                    clearStalePlaceholder();
+                    captureOriginals('billing');
+                    captureOriginals('shipping');
+                }
+                if (isSamedayActive) {
+                    deactivateSameday();
+                }
+                return;
+            }
+
+            // Sameday is selected — set up / restore UI.
+            // Only skip the rebuild if Sameday is ALREADY active AND our own city
+            // select is in the DOM (WC refreshed order-review without rebuilding
+            // billing). The isSamedayActive guard is essential: after switching
+            // away to Econt and back, our old drushfs-city select can linger in
+            // the DOM — without the guard we'd mistake it for a live setup, skip
+            // setupSamedayUI, and never restore the remembered selection.
+            if (isSamedayActive && $('#' + currentContext + '_city').hasClass('drushfs-city')) {
+                return;
+            }
+
+            // WC rebuilt the DOM. Capture clean originals, then set up Sameday.
+            captureOriginals('billing');
+            captureOriginals('shipping');
+
+            setupSamedayUI();
         });
 
-        // Restore what this customer chose before.
-        $('input[name="sameday_delivery_type"][value="' + lastType + '"]').prop('checked', true);
-        handleTypeChange(lastType, true);
-    }
-
-    function handleTypeChange(type, restoring) {
-        lastType = type || 'address';
-
-        var pickup = (lastType === 'easybox' || lastType === 'pudo');
-
-        $('#sameday-point-field').toggle(pickup);
-        $('#sameday-point-label').text(
-            lastType === 'pudo' ? params.i18n.select_pudo : params.i18n.select_easybox
-        );
-
-        // Delivering to a locker means the street address is irrelevant; the
-        // point's own address goes on the waybill instead.
-        toggleAddressFields(!pickup, lastType);
-
-        if (pickup) {
-            loadPoints();
-        } else {
-            setPoint('', '');
-        }
-
-        placeMapButton();
-
-        if (!restoring) {
-            persist();
-            refreshRates();
-        }
-    }
-
-    // WooCommerce still requires the street when its field is hidden, so a
-    // locker order was refused with "Адрес е задължително поле" (browser test,
-    // 17.09.2026). Speedy and Econt put the delivery type into the hidden street
-    // — "До офис" / "До автомат" — and so does this: the waybill goes to the
-    // locker's own address, never to this field.
-    function toggleAddressFields(show, type) {
-        var labels = [params.i18n.to_easybox, params.i18n.to_pudo];
-        var $address1 = $('#' + context + '_address_1');
-
-        $.each(['address_1', 'address_2'], function (_, key) {
-            var $field = $('#' + context + '_' + key + '_field');
-            if ($field.length) {
-                $field.toggle(!!show);
+        // Listen for Country Change (WC re-sorts fields on this event)
+        $(document.body).on('country_to_state_changed', function() {
+            if (isSamedayActive) {
+                setTimeout(function() {
+                    reorderFieldsForSameday();
+                    initStateSelect2WithTransliteration();
+                    makeRegionRequired();
+                }, 100);
             }
         });
 
-        if (show) {
-            // Clear only our placeholder, never a street the customer typed.
-            if (labels.indexOf($address1.val()) !== -1) {
+        // Listen for "Ship to different address" toggle
+        // Payment-method change → re-quote. Sameday's calculate_shipping reads
+        // payment_method from POST and toggles COD additional services on the
+        // API call, and the package hash already varies by payment_method, but
+        // WC doesn't trigger update_checkout on its own when the payment radio
+        // changes — we have to. Delegated on body so it survives WC's payment-
+        // block re-renders.
+        $(document.body).on('change', 'input[name="payment_method"]', function() {
+            if (isSamedayActive) {
+                $(document.body).trigger('update_checkout');
+            }
+        });
+
+        $('form.checkout').on('change', '#ship-to-different-address-checkbox', function() {
+            // If Sameday is active, we need to switch contexts
+            if (isSamedayActive) {
+                // Deactivate on current context (restore fields)
+                deactivateSameday();
+                
+                // Update context
+                updateContext();
+                
+                // Re-activate on new context
+                setupSamedayUI();
+            } else {
+                updateContext();
+            }
+        });
+
+        function updateContext() {
+            if ($('#ship-to-different-address-checkbox').is(':checked')) {
+                currentContext = 'shipping';
+            } else {
+                currentContext = 'billing';
+            }
+        }
+
+        function isSamedaySelected() {
+            // When only one method exists, WC renders a hidden input (no :checked).
+            const selectedMethod = $('input[name^="shipping_method"][type="radio"]:checked, input[name^="shipping_method"][type="hidden"]').first().val();
+            return !!(selectedMethod && selectedMethod.indexOf(samedayMethodId) !== -1);
+        }
+
+        // Initial check on page load
+        updateContext();
+
+        // Grey out the order-review/payment while we rebuild the UI and re-quote.
+        // Without this the restore shows an intermediate "address" price (computed
+        // before the office field is rebuilt) for a split second before settling
+        // on the office price — a visible flicker. WC removes our overlay when it
+        // replaces the review HTML on the next update_checkout.
+        function blockOrderReview() {
+            const $targets = $('.woocommerce-checkout-review-order-table, .woocommerce-checkout-payment');
+            if ($targets.length && typeof $targets.block === 'function') {
+                $targets.block({ message: null, overlayCSS: { background: '#fff', opacity: 0.6 } });
+            }
+        }
+        function unblockOrderReview() {
+            const $targets = $('.woocommerce-checkout-review-order-table, .woocommerce-checkout-payment');
+            if ($targets.length && typeof $targets.unblock === 'function') {
+                $targets.unblock();
+            }
+        }
+
+        /**
+         * Single setup/restore function for the Sameday UI.
+         * Called only from updated_checkout — never from document.ready.
+         * Uses caches when available to avoid redundant AJAX calls.
+         */
+        // WooCommerce pre-fills the street from the customer's last order. After a
+        // locker order that is our placeholder, and on a page that opens with
+        // another courier selected we were never active to clean it up.
+        function clearStalePlaceholder() {
+            const $address1 = $('#' + currentContext + '_address_1');
+            if ([params.i18n.to_easybox, params.i18n.to_pudo].indexOf($address1.val()) !== -1) {
                 $address1.val('');
-            }
-            return;
-        }
-
-        $address1.val(type === 'pudo' ? params.i18n.to_pudo : params.i18n.to_easybox);
-    }
-
-    /* ------------------------------------------------------------------
-     * Points: dropdown and map
-     * --------------------------------------------------------------- */
-
-    function loadPoints(term) {
-        var $select = $('#sameday_point_select');
-        if (!$select.length) {
-            return;
-        }
-
-        $select.prop('disabled', true).html('<option>' + params.i18n.searching + '</option>');
-
-        $.ajax({
-            url: params.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'drushfs_find_points',
-                nonce: params.nonce,
-                term: term || '',
-                delivery_type: lastType,
-                city: cityValue()
-            }
-        }).done(function (response) {
-            var points = (response && response.success && Array.isArray(response.data)) ? response.data : [];
-            fillSelect(points);
-        }).fail(function () {
-            $select.prop('disabled', false).html('<option value="">' + params.i18n.no_results + '</option>');
-        });
-    }
-
-    function fillSelect(points) {
-        var $select = $('#sameday_point_select');
-        var html = '<option value="">' +
-            (lastType === 'pudo' ? params.i18n.select_pudo : params.i18n.select_easybox) +
-            '</option>';
-
-        if (!points.length) {
-            html = '<option value="">' + params.i18n.no_results + '</option>';
-        }
-
-        $.each(points, function (_, p) {
-            // A locker Sameday reports as filling up is still selectable, but
-            // the customer deserves to know before they pick it.
-            var label = p.text + (p.busy ? ' ⚠' : '');
-            html += '<option value="' + p.id + '">' + $('<div>').text(label).html() + '</option>';
-        });
-
-        $select.html(html).prop('disabled', false);
-
-        if (lastPointId) {
-            $select.val(lastPointId);
-            // The remembered point may not be in this city's list; keep the id
-            // rather than silently dropping the customer's choice.
-            if (!$select.val()) {
-                $select.append(
-                    '<option value="' + lastPointId + '" selected>' +
-                    $('<div>').text(lastPointLabel || lastPointId).html() + '</option>'
-                );
+                $('#' + currentContext + '_address_2').val('');
             }
         }
 
-        if (typeof $select.select2 === 'function') {
-            $select.select2({
-                width: '100%',
-                placeholder: lastType === 'pudo' ? params.i18n.select_pudo : params.i18n.select_easybox
+        function setupSamedayUI() {
+            isSamedayActive = true;
+            settingUp = true;
+
+            // A locker type chosen below writes the placeholder back.
+            clearStalePlaceholder();
+
+            // Speedy and Econt (up to their September 2026 releases) recognise
+            // only each other: handing over to anyone else, they restore the
+            // stock field order. If that lands after our layout, lay it out again.
+            setTimeout(function() {
+                if (isSamedayActive) {
+                    reorderFieldsForSameday();
+                }
+            }, 60);
+
+            // Cover the just-rendered intermediate price immediately (same tick,
+            // before paint), so the restore doesn't flicker through it. The full
+            // path ends in a single update_checkout that re-quotes and removes the
+            // overlay; the early-return paths below unblock explicitly.
+            blockOrderReview();
+
+            // Tell the sibling Econt plugin that Sameday now owns the layout, so
+            // its deactivate (which runs after ours when switching) won't restore
+            // the stock field order on top of ours.
+            window.__drushfActiveCourier = 'sameday';
+
+            reorderFieldsForSameday();
+            initStateSelect2WithTransliteration();
+            makeRegionRequired();
+
+            // Restore THIS courier's own remembered selection. Province and city
+            // come ONLY from our own memory (savedSelection) or the server
+            // session — NEVER from the current DOM value, which belongs to the
+            // sibling courier. Sameday and Econt keep fully separate data: picking
+            // a county under Sameday must not pre-fill it under Econt.
+            let restoredState = '';
+            if (savedSelection) {
+                if (savedSelection.deliveryType) lastDeliveryType = savedSelection.deliveryType;
+                if (savedSelection.officeId) lastOfficeId = savedSelection.officeId;
+                if (savedSelection.cityId) cachedCityId = savedSelection.cityId;
+                restoredState = savedSelection.state || '';
+                savedSelection = null;
+            }
+
+            // WC uses '*' as a "no state" sentinel for guests — treat it as empty.
+            const sessionState = (params.current_state && params.current_state !== '*') ? params.current_state : '';
+            const effectiveState = restoredState || sessionState;
+
+            // Apply (or CLEAR) the shared state field to match our own data, so we
+            // never inherit the sibling courier's leftover province.
+            const $stateEl = $('#' + currentContext + '_state');
+            if (($stateEl.val() || '') !== effectiveState) {
+                $stateEl.val(effectiveState).trigger('change.select2');
+            }
+
+            // Postcode is a shared field too — clear it so we don't inherit the
+            // sibling courier's. The restore chain below re-fills it from our own
+            // pre-selected city/office.
+            $('#' + currentContext + '_postcode').val('');
+
+            // City to pre-select comes only from our own cache/session — not the
+            // DOM value, which would be the sibling courier's city.
+            const preSelectCity = cachedCityId || params.current_city_id;
+
+            if (!effectiveState) {
+                $('#' + currentContext + '_city_field').hide();
+                settingUp = false;
+                bindStateChangeHandler();
+                unblockOrderReview();
+                return;
+            }
+
+            // Load cities (cached or AJAX) then continue the chain
+            loadCities(effectiveState, function(cities) {
+                if (!cities) { settingUp = false; bindStateChangeHandler(); unblockOrderReview(); return; }
+
+                replaceCityInputWithSelect(cities, preSelectCity, true); // skip auto-trigger
+
+                const $citySelect = $('#' + currentContext + '_city');
+                const selectedCityId = $citySelect.val();
+
+                if (!selectedCityId) {
+                    // No city matched — user will have to pick one
+                    settingUp = false;
+                    bindStateChangeHandler();
+                    unblockOrderReview();
+                    return;
+                }
+
+                // Load availability (cached or AJAX) then continue
+                loadAvailability(selectedCityId, function(availData) {
+                    if (availData) {
+                        presentDeliveryOptions(availData);
+                    }
+
+                    settingUp = false;
+                    bindStateChangeHandler();
+
+                    // Now trigger a single update_checkout to get the correct price
+                    $(document.body).trigger('update_checkout');
+                });
             });
         }
-    }
 
-    function setPoint(id, label) {
-        lastPointId = id ? String(id) : '';
-        lastPointLabel = label || '';
-        $('#sameday_office_id').val(lastPointId);
+        /**
+         * Load cities for a state — uses cache if available.
+         * Calls callback(cities) when done.
+         */
+        function loadCities(stateCode, callback) {
+            let deferred = $.Deferred();
 
-        if (lastPointId) {
-            persist();
-            refreshRates();
-        }
-    }
-
-    function fetchAllPoints() {
-        if (allPointsCache) {
-            return $.Deferred().resolve(allPointsCache).promise();
-        }
-        if (allPointsPromise) {
-            return allPointsPromise;
-        }
-
-        allPointsPromise = $.ajax({
-            url: params.ajax_url,
-            method: 'POST',
-            data: { action: 'drushfs_get_all_points', nonce: params.nonce }
-        }).then(function (response) {
-            if (response && response.success && Array.isArray(response.data)) {
-                allPointsCache = response.data;
+            if (stateCode === cachedState && cachedCities) {
+                callback(cachedCities);
+                deferred.resolve();
+                return deferred.promise();
             }
-            allPointsPromise = null;
-            return allPointsCache || [];
-        }, function () {
-            allPointsPromise = null;
-            return [];
-        });
 
-        return allPointsPromise;
-    }
+            $.ajax({
+                url: params.ajax_url,
+                type: 'POST',
+                data: { action: 'drushfs_get_cities', nonce: params.nonce, region: stateCode },
+                success: function(response) {
+                    if (response.success) {
+                        cachedState = stateCode;
+                        cachedCities = response.data;
+                        callback(response.data);
+                    } else {
+                        callback(null);
+                    }
+                    deferred.resolve();
+                },
+                error: function() { callback(null); deferred.resolve(); }
+            });
 
-    // Idempotent: called from every setup path so the button follows the
-    // layout as our fields appear and disappear.
-    function placeMapButton() {
-        $('#sameday-map-button-wrapper').remove();
-
-        if (!isActive || lastType === 'address') {
-            return;
+            return deferred.promise();
         }
 
-        var html =
-            '<p class="form-row form-row-wide" id="sameday-map-button-wrapper" style="margin-top:10px;">' +
-            '<button type="button" id="sameday-open-map" class="button" style="width:100%;">' +
-            params.i18n.select_from_map + '</button></p>';
+        /**
+         * Load availability for a city — uses cache if available.
+         * Calls callback(data) when done.
+         */
+        function loadAvailability(cityId, callback) {
+            if (String(cityId) === String(cachedCityId) && cachedAvailability) {
+                callback(cachedAvailability);
+                return;
+            }
 
-        $('#sameday-point-field').after(html);
-
-        $('#sameday-open-map').off('click.samedayMap').on('click.samedayMap', openMap);
-    }
-
-    function openMap() {
-        if (!window.DrushfsMap) {
-            return;
+            $.ajax({
+                url: params.ajax_url,
+                type: 'POST',
+                data: { action: 'drushfs_check_availability', nonce: params.nonce, city_id: cityId },
+                success: function(response) {
+                    if (response.success) {
+                        cachedCityId = cityId;
+                        cachedAvailability = response.data;
+                        callback(response.data);
+                    } else {
+                        callback(null);
+                    }
+                },
+                error: function() { callback(null); }
+            });
         }
 
-        // map.js speaks Speedy's vocabulary: 'automat' is the unstaffed point
-        // (our easybox), 'office' the staffed one (SAMEDAY point).
-        var filter = (lastType === 'pudo') ? 'office' : 'automat';
-        var title = (lastType === 'pudo') ? params.i18n.map_title_pudo : params.i18n.map_title_easybox;
+        /**
+         * Bind the state change handler (user changes state dropdown).
+         */
+        function bindStateChangeHandler() {
+            // Bind directly on the state element (not delegated on body) — this
+            // way the handler survives select2 init/destroy cycles. When we
+            // re-init the state select2 after the first province change, the
+            // change event stops bubbling to body, which silently killed the old
+            // delegated handler so changing the province a second time did
+            // nothing. updated_checkout calls this every cycle, so off-then-on is
+            // idempotent. (Mirrors the Drusoft Shipping for Econt sibling.)
+            const $state = $('#' + currentContext + '_state');
+            $state.off('change.sameday');
+            $state.on('change.sameday', function() {
+                const state = $(this).val();
+                if (!isSamedayActive) return;
 
-        fetchAllPoints().then(function (all) {
-            // Open zoomed to the customer's city, as the Speedy and Econt maps
-            // do. Our city field holds a name, not an id, so borrow the id from
-            // any point in that city.
-            var city = cityValue().toLowerCase();
-            var inCity = city ? all.find(function (p) {
-                return String(p.city_name || '').toLowerCase() === city;
-            }) : null;
+                // State changed — remove stale delivery options
+                $('#sameday-delivery-type-field').remove();
+                $('#sameday-office-field').remove();
+                $('#sameday-map-button-wrapper').remove();
+                lastDeliveryType = 'address';
+                lastOfficeId = '';
 
-            window.DrushfsMap.open(all, handleMapPick, {
-                title: title,
-                hint: params.i18n.map_hint,
-                pickLabel: params.i18n.map_pick,
-                errorLabel: params.i18n.map_error,
-                defaultFilter: filter,
-                focusCityId: inCity ? inCity.city_id : null,
-                i18n: {
-                    offices: params.i18n.map_filter_office,
-                    automats: params.i18n.map_filter_automat,
-                    both: params.i18n.map_filter_both,
-                    search_placeholder: params.i18n.map_search_placeholder,
-                    results_count: params.i18n.map_results_count,
-                    search_no_results: params.i18n.map_search_no_results
+                // The options are gone until a city is chosen, so the street
+                // must not stay hidden behind a locker placeholder.
+                clearStalePlaceholder();
+                $('#' + currentContext + '_address_1_field, #' + currentContext + '_address_2_field').show();
+
+                // Invalidate caches
+                cachedState = '';
+                cachedCities = null;
+                cachedCityId = '';
+                cachedAvailability = null;
+
+                // Clear city field — destroy select2 if present, then reset
+                const $cityEl = $('#' + currentContext + '_city');
+                if ($cityEl.is('select') && $cityEl.hasClass('select2-hidden-accessible')) {
+                    $cityEl.val('').trigger('change.select2');
+                    $cityEl.select2('destroy');
+                }
+                const $cityField = $('#' + currentContext + '_city_field');
+                if (originals[currentContext] && originals[currentContext].cityHtml) {
+                    $cityField.html(originals[currentContext].cityHtml);
+                    $('#' + currentContext + '_city').val('');
+                }
+
+                // Clear postcode — it belongs to the previous city
+                $('#' + currentContext + '_postcode').val('');
+
+                if (state) {
+                    $('#' + currentContext + '_city_field').show();
+                    handleStateChange(state);
+                } else {
+                    $('#' + currentContext + '_city_field').hide();
+                }
+                $(document.body).trigger('update_checkout');
+            });
+        }
+
+
+
+        function deactivateSameday() {
+            isSamedayActive = false;
+
+            // Snapshot the current selection BEFORE we tear the fields down, so
+            // we can restore it if the user switches back to Sameday. Captured
+            // separately from the load-bearing resets below — those must still
+            // run for a clean teardown.
+            // Read from OUR private caches FIRST, not the shared DOM fields. The
+            // sibling courier's updated_checkout handler runs before our deactivate
+            // and may have already written ITS province/city into #billing_state /
+            // #billing_city — reading the DOM here would capture the sibling's data
+            // as ours. cachedState / cachedCityId hold only THIS courier's values.
+            const $remCity = $('#' + currentContext + '_city');
+            const domCity = ($remCity.is('select') && $remCity.hasClass('drushfs-city')) ? $remCity.val() : '';
+            const remState = cachedState || $('#' + currentContext + '_state').val();
+            const remCity = cachedCityId || domCity;
+            if (remState || remCity || lastDeliveryType !== 'address' || lastOfficeId) {
+                savedSelection = {
+                    state: remState || '',
+                    cityId: remCity || '',
+                    deliveryType: lastDeliveryType,
+                    officeId: lastOfficeId
+                };
+            }
+
+            $('#' + currentContext + '_state, #shipping_state').off('change.sameday');
+
+            // If the sibling Econt plugin is the courier now taking over, it has
+            // already (synchronously) re-laid-out the billing fields for itself.
+            // Running the full stock-field restore here would clobber Econt's
+            // field order and re-show the address field. In that case only remove
+            // OUR injected UI. Otherwise (switching to a non-courier method) do
+            // the full restore so the stock checkout returns to normal.
+            if (window.__drushfActiveCourier && window.__drushfActiveCourier !== 'sameday') {
+                $('#sameday-delivery-type-field, #sameday-office-field, #sameday-map-button-wrapper').remove();
+            } else {
+                restoreOriginalFields();
+                restoreFieldOrder();
+            }
+
+            lastDeliveryType = 'address';
+            lastOfficeId = '';
+            sessionStorage.removeItem('sameday_delivery_type');
+            sessionStorage.removeItem('sameday_office_id');
+        }
+
+        function reorderFieldsForSameday() {
+            const $stateField = $('#' + currentContext + '_state_field');
+            const $countryField = $('#' + currentContext + '_country_field');
+            const $cityField = $('#' + currentContext + '_city_field');
+
+            $stateField.insertAfter($countryField);
+            $stateField.attr('data-priority', 41);
+            
+            $cityField.insertAfter($stateField);
+            $cityField.attr('data-priority', 42);
+            
+            $('#sameday-delivery-type-field').insertAfter($cityField);
+        }
+
+        function restoreFieldOrder() {
+            const $stateField = $('#' + currentContext + '_state_field');
+            const $countryField = $('#' + currentContext + '_country_field');
+            const $cityField = $('#' + currentContext + '_city_field');
+            const $address1Field = $('#' + currentContext + '_address_1_field');
+            const $address2Field = $('#' + currentContext + '_address_2_field');
+            
+            const originalPrio = originals[currentContext].priorities;
+
+            $address1Field.insertAfter($countryField);
+            $address2Field.insertAfter($address1Field);
+            $cityField.insertAfter($address2Field);
+            if (originalPrio && originalPrio.city) $cityField.attr('data-priority', originalPrio.city);
+
+            $stateField.insertAfter($cityField);
+            if (originalPrio && originalPrio.state) $stateField.attr('data-priority', originalPrio.state);
+        }
+
+        /**
+         * Re-init the state select2 with our transliteration-aware matcher.
+         * WooCommerce initializes it without transliteration support.
+         */
+        function initStateSelect2WithTransliteration() {
+            SamedayModern.initStateSelect2(
+                $('#' + currentContext + '_state'),
+                params.current_state
+            );
+        }
+
+        function makeRegionRequired() {
+            const $field = $('#' + currentContext + '_state_field');
+            if (!$field.hasClass('validate-required')) {
+                $field.addClass('validate-required');
+                $field.find('label .optional').hide();
+                if ($field.find('label .required').length === 0) {
+                    $field.find('label').append('&nbsp;<abbr class="required" title="required">*</abbr>');
+                }
+            } else {
+                $field.find('label .optional').hide();
+                if ($field.find('label .required').length === 0) {
+                    $field.find('label').append('&nbsp;<abbr class="required" title="required">*</abbr>');
+                }
+            }
+        }
+
+        function restoreOriginalFields() {
+            const $cityInput = $('#' + currentContext + '_city');
+            const $cityField = $('#' + currentContext + '_city_field');
+            
+            // Only restore the city if WE own it. If the sibling Econt plugin
+            // has already taken over the field (its own select), leave it alone —
+            // tearing it down here would blank out the courier the user just
+            // switched to.
+            if ($cityInput.is('select') && $cityInput.hasClass('drushfs-city')) {
+                if ($cityInput.data('select2')) {
+                    $cityInput.select2('destroy');
+                }
+                $cityField.html(originals[currentContext].cityHtml);
+                $('#' + currentContext + '_city').prop('disabled', false).val('');
+            }
+
+            const $stateField = $('#' + currentContext + '_state_field');
+            $stateField.find('label .optional').show();
+            $stateField.find('label .required').remove();
+            $stateField.removeClass('validate-required');
+
+            const $address1Field = $('#' + currentContext + '_address_1_field');
+            const $address2Field = $('#' + currentContext + '_address_2_field');
+
+            $address1Field.html(originals[currentContext].address1Html).show();
+            $address2Field.html(originals[currentContext].address2Html).show();
+            
+            const addr1 = $address1Field.find('#' + currentContext + '_address_1').val();
+            if (addr1 === params.i18n.to_easybox || addr1 === params.i18n.to_pudo) {
+                $address1Field.find('#' + currentContext + '_address_1').val('');
+                $address2Field.find('#' + currentContext + '_address_2').val('');
+            }
+            
+            $('#' + currentContext + '_postcode').val('');
+            
+            $('#sameday-delivery-type-field').remove();
+            $('#sameday-office-field').remove();
+            $('#sameday-map-button-wrapper').remove();
+
+            $cityField.show();
+
+            // Re-apply WC's native selectWoo on the state field so the searchable
+            // dropdown is restored after we destroyed our custom Select2.
+            var $stateEl = $('#' + currentContext + '_state');
+            if ($stateEl.is('select') && $.fn.selectWoo) {
+                if ($stateEl.hasClass('select2-hidden-accessible')) {
+                    $stateEl.select2('destroy');
+                }
+                $stateEl.selectWoo({ width: '100%' });
+            }
+        }
+
+        function handleStateChange(stateCode, preSelectedCity) {
+            if (!isSamedayActive || !stateCode) {
+                return;
+            }
+
+            // Use loadCities which handles caching
+            return loadCities(stateCode, function(cities) {
+                if (cities) {
+                    replaceCityInputWithSelect(cities, preSelectedCity);
                 }
             });
-        });
-    }
-
-    function handleMapPick(point) {
-        // Picking on the map may mean switching type: someone browsing easybox
-        // can land on a SAMEDAY point and vice versa.
-        var mapType = (point.office_type === 'PUDO') ? 'pudo' : 'easybox';
-
-        if (mapType !== lastType) {
-            $('input[name="sameday_delivery_type"][value="' + mapType + '"]').prop('checked', true);
-            handleTypeChange(mapType, true);
         }
 
-        var label = pointLabel({
-            name: point.name,
-            city: point.city_name,
-            address: point.address
-        });
+        function replaceCityInputWithSelect(cities, preSelectedCity, skipAutoTrigger) {
+            const $cityField = $('#' + currentContext + '_city_field');
+            const $cityWrapper = $cityField.find('.woocommerce-input-wrapper');
+            const currentCity = preSelectedCity || $('#' + currentContext + '_city').val() || params.current_city_id;
 
-        var $select = $('#sameday_point_select');
-        if ($select.length && !$select.find('option[value="' + point.id + '"]').length) {
-            $select.append('<option value="' + point.id + '">' + $('<div>').text(label).html() + '</option>');
-        }
-        $select.val(String(point.id));
-        if (typeof $select.select2 === 'function') {
-            $select.trigger('change.select2');
-        }
+            let options = '<option value="">' + params.i18n.select_city + '</option>';
+            $.each(cities, function(index, city) {
+                let selected = '';
+                if (currentCity) {
+                    if (String(city.id) === String(currentCity)) {
+                        selected = 'selected';
+                    } else if (city.name.toUpperCase() === String(currentCity).toUpperCase()) {
+                        selected = 'selected';
+                    }
+                }
+                
+                options += '<option value="' + city.id + '" data-postcode="' + (city.postcode || '') + '" ' + selected + '>' + city.name + ' ' + (city.postcode ? '(' + city.postcode + ')' : '') + '</option>';
+            });
 
-        setPoint(point.id, label);
-    }
+            const selectHtml = '<select name="' + currentContext + '_city" id="' + currentContext + '_city" class="select2-hidden-accessible drushfs-city" data-placeholder="' + params.i18n.select_city + '">' + options + '</select>';
+            
+            $cityWrapper.html(selectHtml);
 
-    /* ------------------------------------------------------------------
-     * Server state
-     * --------------------------------------------------------------- */
+            const $newCitySelect = $('#' + currentContext + '_city');
+            $newCitySelect.select2({
+                width: '100%',
+                matcher: modelMatcher
+            });
 
-    function persist() {
-        lastCity = cityValue();
-
-        try {
-            sessionStorage.setItem('sameday_delivery_type', lastType);
-            sessionStorage.setItem('sameday_office_id', lastPointId);
-        } catch (e) {
-            // Private browsing: the server session below still carries it.
-        }
-
-        $.ajax({
-            url: params.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'drushfs_save_cart_selection',
-                nonce: params.nonce,
-                delivery_type: lastType,
-                office_id: lastPointId,
-                city: lastCity
+            $newCitySelect.on('change', function() {
+                handleCityChange($(this).val());
+            });
+            
+            // When called from setupSamedayUI, skip auto-trigger — the caller controls the chain.
+            if (!skipAutoTrigger) {
+                if ($newCitySelect.val()) {
+                     handleCityChange($newCitySelect.val());
+                } else {
+                     settingUp = false;
+                }
             }
-        });
-    }
 
-    function refreshRates() {
-        $(document.body).trigger('update_checkout');
-    }
-
-    /* ------------------------------------------------------------------
-     * Activate / deactivate
-     * --------------------------------------------------------------- */
-
-    // The stock checkout order puts the street, then the city, then the region.
-    // Speedy and Econt move region and city up under the country, and a customer
-    // switching between couriers should not watch the fields jump around, so
-    // Sameday does the same. The original priorities are kept to put them back.
-    var originalPriorities = {};
-
-    function reorderFields() {
-        var $country = $('#' + context + '_country_field');
-        var $state = $('#' + context + '_state_field');
-        var $city = $('#' + context + '_city_field');
-
-        if (!originalPriorities[context]) {
-            originalPriorities[context] = {
-                state: $state.attr('data-priority'),
-                city: $city.attr('data-priority')
-            };
-        }
-
-        $state.insertAfter($country).attr('data-priority', 41);
-        $city.insertAfter($state).attr('data-priority', 42);
-        $('#sameday-delivery-type-field').insertAfter($city);
-        $('#sameday-point-field').insertAfter('#sameday-delivery-type-field');
-    }
-
-    function restoreFieldOrder() {
-        var $country = $('#' + context + '_country_field');
-        var $state = $('#' + context + '_state_field');
-        var $city = $('#' + context + '_city_field');
-        var $address1 = $('#' + context + '_address_1_field');
-        var $address2 = $('#' + context + '_address_2_field');
-        var prio = originalPriorities[context] || {};
-
-        $address1.insertAfter($country);
-        $address2.insertAfter($address1);
-        $city.insertAfter($address2.length ? $address2 : $address1);
-        if (prio.city) {
-            $city.attr('data-priority', prio.city);
-        }
-        $state.insertAfter($city);
-        if (prio.state) {
-            $state.attr('data-priority', prio.state);
-        }
-    }
-
-    function setup() {
-        if (settingUp) {
-            return;
-        }
-        settingUp = true;
-        isActive = true;
-
-        window.__drushfActiveCourier = 'sameday';
-
-        updateContext();
-        renderDeliveryOptions();
-        reorderFields();
-        placeMapButton();
-
-        settingUp = false;
-    }
-
-    // WooCommerce pre-fills the street from the customer's last order. After a
-    // locker order that is our placeholder, and on a page that opens with
-    // another courier selected we were never active to clean it up.
-    function clearStalePlaceholder() {
-        var $address1 = $('#' + context + '_address_1');
-        if ([params.i18n.to_easybox, params.i18n.to_pudo].indexOf($address1.val()) !== -1) {
-            $address1.val('');
-        }
-    }
-
-    function teardown() {
-        if (!isActive) {
-            clearStalePlaceholder();
-            return;
-        }
-        isActive = false;
-
-        // A sibling courier that has just taken over has already laid the
-        // fields out for itself. Tear down only what is ours.
-        $('#sameday-delivery-type-field, #sameday-point-field, #sameday-map-button-wrapper').remove();
-
-        toggleAddressFields(true);
-
-        // Only put the stock order back when the customer left for a
-        // non-courier method. If Speedy or Econt took over, they have already
-        // laid the fields out for themselves.
-        if (window.__drushfActiveCourier === 'sameday') {
-            window.__drushfActiveCourier = '';
-            restoreFieldOrder();
-        }
-    }
-
-    /* ------------------------------------------------------------------
-     * Wiring
-     * --------------------------------------------------------------- */
-
-    // Speedy and Econt (up to their September 2026 releases) recognise only each
-    // other: when they hand the checkout over they restore the stock field order
-    // unless the newcomer is their known sibling — so switching from Speedy to
-    // Sameday put region and city back below the street, on top of our layout.
-    // Their teardown runs in the same event as our setup, so reapply the order
-    // once it has finished.
-    function setupAndSettle() {
-        setup();
-        setTimeout(function () {
-            if (isActive) {
-                reorderFields();
+            // Set postcode for pre-selected city. During a restore (skipAutoTrigger)
+            // set the value WITHOUT firing 'change' — that would kick off an extra
+            // intermediate update_checkout (computing the wrong price before the
+            // office is rebuilt). The single update_checkout at the end of the
+            // restore sends this postcode value anyway.
+            if ($newCitySelect.val()) {
+                const $sel = $newCitySelect.find(':selected');
+                const pc = $sel.data('postcode');
+                if (pc) {
+                    const $pc = $('#' + currentContext + '_postcode');
+                    if (skipAutoTrigger) {
+                        $pc.val(pc);
+                    } else {
+                        $pc.val(pc).trigger('change');
+                    }
+                }
             }
-        }, 60);
-    }
-
-    $(document.body).on('updated_checkout', function () {
-        updateContext();
-
-        if (isSamedaySelected()) {
-            setupAndSettle();
-        } else {
-            teardown();
         }
+
+        function handleCityChange(cityId) {
+            if (!cityId) return;
+
+            const $selectedOption = $('#' + currentContext + '_city').find(':selected');
+            const postcode = $selectedOption.data('postcode');
+            if (postcode) {
+                $('#' + currentContext + '_postcode').val(postcode).trigger('change');
+            }
+
+            loadAvailability(cityId, function(data) {
+                if (data) {
+                    presentDeliveryOptions(data);
+                }
+                $(document.body).trigger('update_checkout');
+                settingUp = false;
+            });
+        }
+
+        function presentDeliveryOptions(data) {
+            $('#sameday-delivery-type-field').remove();
+            $('#sameday-office-field').remove();
+            $('#sameday-map-button-wrapper').remove();
+
+            const $address1Field = $('#' + currentContext + '_address_1_field');
+            const $address2Field = $('#' + currentContext + '_address_2_field');
+
+            if (!data.has_easybox && !data.has_pudo) {
+                $address1Field.show();
+                $address2Field.show();
+                $address1Field.find('input').val('');
+                $address2Field.find('input').val('');
+                return;
+            }
+
+            let radios = '<span class="woocommerce-input-wrapper" id="sameday-delivery-type-wrapper">';
+            
+            radios += '<input type="radio" name="sameday_delivery_type" id="sameday_delivery_type_address" value="address" checked="checked" style="margin-left: 0;">' +
+                      '<label for="sameday_delivery_type_address" style="display: inline-block; margin-right: 15px; margin-left: 5px;">' + params.i18n.to_address + '</label>';
+
+            if (data.has_easybox) {
+                radios += '<input type="radio" name="sameday_delivery_type" id="sameday_delivery_type_easybox" value="easybox">' +
+                          '<label for="sameday_delivery_type_easybox" style="display: inline-block; margin-right: 15px; margin-left: 5px;">' + params.i18n.to_easybox + '</label>';
+                $('#' + currentContext + '_city_field').data('easyboxes', data.easyboxes || []);
+            }
+            if (data.has_pudo) {
+                radios += '<input type="radio" name="sameday_delivery_type" id="sameday_delivery_type_pudo" value="pudo">' +
+                          '<label for="sameday_delivery_type_pudo" style="display: inline-block; margin-left: 5px;">' + params.i18n.to_pudo + '</label>';
+                $('#' + currentContext + '_city_field').data('pudos', data.pudos || []);
+            }
+            radios += '</span>';
+
+            const radioHtml = '<p class="form-row form-row-wide" id="sameday-delivery-type-field">' +
+                '<label>' + params.i18n.delivery_method + '</label>' + radios + '</p>';
+
+            $('#' + currentContext + '_city_field').after(radioHtml);
+
+            $('input[name="sameday_delivery_type"]').on('change', function() {
+                handleDeliveryTypeChange($(this).val());
+                // Delivery type changed → recalculate shipping
+                $(document.body).trigger('update_checkout');
+            });
+            
+            // A remembered type this city does not have falls back to address.
+            if (!$('input[name="sameday_delivery_type"][value="' + lastDeliveryType + '"]').length) {
+                lastDeliveryType = 'address';
+                lastOfficeId = '';
+            }
+
+            // Trigger initial state
+            if (lastDeliveryType !== 'address') {
+                $('input[name="sameday_delivery_type"][value="' + lastDeliveryType + '"]').prop('checked', true);
+            }
+            handleDeliveryTypeChange(lastDeliveryType);
+        }
+
+        function handleDeliveryTypeChange(type) {
+            $('#sameday-office-field').remove();
+            $('#sameday-map-button-wrapper').remove();
+
+            sessionStorage.setItem('sameday_delivery_type', type);
+            lastDeliveryType = type;
+            
+            const $address1Field = $('#' + currentContext + '_address_1_field');
+            const $address2Field = $('#' + currentContext + '_address_2_field');
+
+            if (type === 'address') {
+                $address1Field.show();
+                $address2Field.show();
+                $address1Field.find('input').val('');
+                $address2Field.find('input').val('');
+            } else {
+                $address1Field.hide();
+                $address2Field.hide();
+                // Unregister — address fields are hidden, no autocomplete needed
+                    if (type === 'easybox') {
+                    $address1Field.find('input').val(params.i18n.to_easybox);
+                } else if (type === 'pudo') {
+                    $address1Field.find('input').val(params.i18n.to_pudo);
+                }
+
+                let points = [];
+                if (type === 'easybox') {
+                    points = $('#' + currentContext + '_city_field').data('easyboxes');
+                } else if (type === 'pudo') {
+                    points = $('#' + currentContext + '_city_field').data('pudos');
+                }
+
+                showPointsDropdown(points, type);
+            }
+        }
+
+        function showPointsDropdown(points, type) {
+            const label = (type === 'easybox') ? params.i18n.select_easybox : params.i18n.select_pudo;
+            let options = '<option value="" selected></option>';
+
+            $.each(points, function(index, point) {
+                options += '<option value="' + point.id + '">' + point.label + '</option>';
+            });
+
+            const selectHtml = '<p class="form-row form-row-wide" id="sameday-office-field">' +
+                '<label for="sameday_office_id">' + label + '&nbsp;<abbr class="required" title="required">*</abbr></label>' +
+                '<span class="woocommerce-input-wrapper">' +
+                '<select name="sameday_office_id" id="sameday_office_id">' + options + '</select>' +
+                '</span></p>';
+
+            $('#sameday-delivery-type-field').after(selectHtml);
+            
+            const $officeSelect = $('#sameday_office_id');
+            $officeSelect.select2({
+                width: '100%',
+                placeholder: label + '...',
+                allowClear: true,
+                matcher: modelMatcher
+            });
+
+            // Pre-select saved office (if any) BEFORE binding the change handler.
+            // Otherwisek, ensure the placeholder is shown (no office selected).
+            if (lastOfficeId) {
+                $officeSelect.val(lastOfficeId).trigger('change.select2');
+            } else {
+                $officeSelect.val('').trigger('change.select2');
+            }
+
+            // Now bind the change handler for user-initiated changes
+            $officeSelect.on('change', function() {
+                const officeVal = $(this).val();
+                const selectedText = $(this).find('option:selected').text();
+                const deliveryType = $('input[name="sameday_delivery_type"]:checked').val();
+                
+                const $address1Field = $('#' + currentContext + '_address_1_field');
+                const $address2Field = $('#' + currentContext + '_address_2_field');
+
+                if (deliveryType === 'easybox') {
+                    $address1Field.find('input').val(params.i18n.to_easybox);
+                } else if (deliveryType === 'pudo') {
+                    $address1Field.find('input').val(params.i18n.to_pudo);
+                }
+                
+                $address2Field.find('input').val(officeVal ? selectedText : '');
+
+                lastOfficeId = officeVal || '';
+                sessionStorage.setItem('sameday_office_id', lastOfficeId);
+
+                // Office/automat selected → recalculate shipping
+                $(document.body).trigger('update_checkout');
+            });
+
+            const mapBtnHtml = '<p class="form-row form-row-wide" id="sameday-map-button-wrapper" style="margin-top: 10px;">' +
+                '<button type="button" id="sameday-open-map" class="button" style="width: 100%;">' + params.i18n.select_from_map + '</button>' +
+                '</p>';
+
+            $('#sameday-office-field').after(mapBtnHtml);
+
+            $('#sameday-open-map').on('click', function() {
+                openSamedayMap();
+            });
+        }
+
+        /**
+         * Own Leaflet map (assets/js/map.js), the module the Speedy and Econt
+         * plugins use, showing the chosen city's pickup locations.
+         */
+        function openSamedayMap() {
+            const cityId = $('#' + currentContext + '_city').val();
+
+            if (!cityId) {
+                alert(params.i18n.alert_select_city);
+                return;
+            }
+            if (!window.DrushfsMap) return;
+
+            const currentType = $('input[name="sameday_delivery_type"]:checked').val() || 'easybox';
+
+            // Coordinates are fetched HERE, on the click, not with the dropdown:
+            // shipping the map payload alongside every city change made Sofia's
+            // availability response 226 KB and stalled the checkout on mobile
+            // data for everyone, including the ~90% who never open the map.
+            $.ajax({
+                url: params.ajax_url,
+                type: 'POST',
+                data: { action: 'drushfs_map_points', nonce: params.nonce, city_id: cityId },
+                success: function(response) {
+                    if (!response || !response.success) return;
+                    const points = response.data || [];
+                    if (!points.length) return;
+
+                window.DrushfsMap.open(points, function(point) {
+                    const targetType = (point.office_type === 'APS') ? 'easybox' : 'pudo';
+                    const $radio = $('input[name="sameday_delivery_type"][value="' + targetType + '"]');
+                    if ($radio.length && !$radio.prop('checked')) {
+                        $radio.prop('checked', true).trigger('change');
+                    }
+                    // The office select repopulates after a type switch — retry
+                    // briefly until the picked option exists, then commit it.
+                    let tries = 0;
+                    (function commit() {
+                        const $sel = $('#sameday_office_id');
+                        if ($sel.length && $sel.find('option[value="' + point.id + '"]').length) {
+                            $sel.val(String(point.id)).trigger('change');
+                            return;
+                        }
+                        if (++tries < 15) setTimeout(commit, 200);
+                    })();
+                }, {
+                    title:         (targetTitle(currentType)),
+                    hint:          params.i18n.map_hint,
+                    pickLabel:     params.i18n.map_pick,
+                    errorLabel:    params.i18n.map_error,
+                    defaultFilter: (currentType === 'pudo') ? 'office' : 'automat',
+                    i18n: {
+                        offices:            params.i18n.map_filter_office,
+                        automats:           params.i18n.map_filter_automat,
+                        both:               params.i18n.map_filter_both,
+                        search_placeholder: params.i18n.map_search_placeholder,
+                        results_count:      params.i18n.map_results_count,
+                        search_no_results:  params.i18n.map_search_no_results,
+                    },
+                });
+                }
+            });
+
+            function targetTitle(type) {
+                return (type === 'pudo')
+                    ? (params.i18n.map_title_pudo || params.i18n.select_from_map)
+                    : (params.i18n.map_title_easybox || params.i18n.select_from_map);
+            }
+        }
+
+        // --- Select2 matcher (from sameday-common.js) ---
+        var modelMatcher = SamedayModern.modelMatcher;
+
     });
+})(jQuery, window.drushfs_params);
 
-    $(document.body).on('change', 'input[name^="shipping_method"]', function () {
-        if (isSamedaySelected()) {
-            setupAndSettle();
-        } else {
-            teardown();
-        }
-    });
 
-    // Changing the city changes which points are near enough to matter.
-    $(document.body).on('change', '#billing_city, #shipping_city', function () {
-        if (!isActive || lastType === 'address') {
-            return;
-        }
-        if (cityValue() === lastCity) {
-            return;
-        }
-        allPointsCache = null;
-        loadPoints();
-    });
 
-    // Typing in the select2 search box filters against the whole country.
-    $(document).on('input', '.select2-search__field', function () {
-        if (!isActive || lastType === 'address') {
-            return;
-        }
-        var term = $(this).val();
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(function () {
-            loadPoints(term);
-        }, 300);
-    });
 
-    // A locker order must carry a locker.
-    $('form.checkout').on('checkout_place_order', function () {
-        if (!isActive || lastType === 'address') {
-            return true;
-        }
-        if (!lastPointId) {
-            window.alert(params.i18n.alert_select_point);
-            return false;
-        }
-        return true;
-    });
-});

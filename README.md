@@ -19,8 +19,9 @@ Sibling plugins with the same checkout experience: [Drusoft Shipping for Speedy]
 ### For customers
 - **Three delivery options** — address (24H), easybox locker, SAMEDAY point
 - **Live prices** from Sameday for the real parcel, city and payment method
-- **Searchable pickup list**, nearest to the customer's city first
-- **Map picker** (Leaflet, bundled locally) with filters and search
+- **Region → city list** (searchable in Latin or Cyrillic) that fills the postcode — the same flow as the Speedy and Econt siblings
+- **Only what the city has** — easybox and SAMEDAY point appear only where one exists
+- **Map picker** (Leaflet, bundled locally) for the chosen city, with filters and search
 - **Full lockers hidden** — locations over capacity are not offered
 
 ### For merchants

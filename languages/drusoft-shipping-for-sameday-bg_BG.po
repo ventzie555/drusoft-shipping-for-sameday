@@ -1,8 +1,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Drusoft Shipping for Sameday 0.1.0\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/drusoft-shipping-for-sameday\n"
-"POT-Creation-Date: 2026-09-17T12:24:52+00:00\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/drusoft-shipping-"
+"for-sameday\n"
+"POT-Creation-Date: 2026-09-17T14:08:28+00:00\n"
 "PO-Revision-Date: 2023-10-27 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: Bulgarian\n"
@@ -25,8 +26,12 @@ msgstr "https://github.com/ventzie555/drusoft-shipping-for-sameday"
 
 #. Description of the plugin
 #: drusoft-shipping-for-sameday.php
-msgid "A clean, conflict-free Sameday integration for Bulgaria — live prices, easybox and address delivery, waybills and labels."
-msgstr "Изчистена интеграция със Sameday за България без конфликти — цени на живо, доставка до адрес и до easybox, товарителници и етикети."
+msgid ""
+"A clean, conflict-free Sameday integration for Bulgaria — live prices, "
+"easybox and address delivery, waybills and labels."
+msgstr ""
+"Изчистена интеграция със Sameday за България без конфликти — цени на живо, "
+"доставка до адрес и до easybox, товарителници и етикети."
 
 #. Author of the plugin
 #: drusoft-shipping-for-sameday.php
@@ -38,361 +43,415 @@ msgstr "ДРУСОФТ ЕООД"
 msgid "https://drusoft.dev/"
 msgstr "https://drusoft.dev/"
 
-#: class-drushfs-shipping-method.php:51 drusoft-shipping-for-sameday.php:858
+#: class-drushfs-shipping-method.php:46 drusoft-shipping-for-sameday.php:923
 msgid "Sameday"
 msgstr "Sameday"
 
-#: class-drushfs-shipping-method.php:52
-msgid "Delivery to an address, an easybox or a SAMEDAY point, priced by Sameday."
+#: class-drushfs-shipping-method.php:47
+msgid ""
+"Delivery to an address, an easybox or a SAMEDAY point, priced by Sameday."
 msgstr "Доставка до адрес, до easybox или до SAMEDAY point с цени от Sameday."
 
-#: class-drushfs-shipping-method.php:69 class-drushfs-shipping-method.php:98
+#: class-drushfs-shipping-method.php:64 class-drushfs-shipping-method.php:93
 msgid "Sameday delivery"
 msgstr "Доставка със Sameday"
 
-#: class-drushfs-shipping-method.php:85
+#: class-drushfs-shipping-method.php:80
 msgid "Sameday API"
 msgstr "Sameday API"
 
-#: class-drushfs-shipping-method.php:89
+#: class-drushfs-shipping-method.php:84
 msgid "Module status"
 msgstr "Статус на модула"
 
-#: class-drushfs-shipping-method.php:91
+#: class-drushfs-shipping-method.php:86
 msgid "Enable Sameday at checkout"
 msgstr "Включи Sameday в поръчката"
 
-#: class-drushfs-shipping-method.php:95
+#: class-drushfs-shipping-method.php:90
 msgid "Method title"
 msgstr "Заглавие на метода"
 
-#: class-drushfs-shipping-method.php:97
+#: class-drushfs-shipping-method.php:92
 msgid "Shown to the customer at checkout."
 msgstr "Показва се на клиента при поръчка."
 
-#: class-drushfs-shipping-method.php:102
+#: class-drushfs-shipping-method.php:97
 msgid "Environment"
 msgstr "Среда"
 
-#: class-drushfs-shipping-method.php:105
+#: class-drushfs-shipping-method.php:100
 msgid "Demo (sameday-api-bg.demo.zitec.com)"
 msgstr "Демо (sameday-api-bg.demo.zitec.com)"
 
-#: class-drushfs-shipping-method.php:106
+#: class-drushfs-shipping-method.php:101
 msgid "Production (api.sameday.bg)"
 msgstr "Продукционна (api.sameday.bg)"
 
-#: class-drushfs-shipping-method.php:109
-msgid "Demo and production have separate credentials. Waybills created on demo are not real shipments."
-msgstr "Демо и продукционната среда имат отделни данни за достъп. Товарителниците в демо средата не са реални пратки."
+#: class-drushfs-shipping-method.php:104
+msgid ""
+"Demo and production have separate credentials. Waybills created on demo are "
+"not real shipments."
+msgstr ""
+"Демо и продукционната среда имат отделни данни за достъп. Товарителниците в "
+"демо средата не са реални пратки."
 
-#: class-drushfs-shipping-method.php:113
+#: class-drushfs-shipping-method.php:108
 msgid "Username"
 msgstr "Потребителско име"
 
-#: class-drushfs-shipping-method.php:117
+#: class-drushfs-shipping-method.php:112
 msgid "Password"
 msgstr "Парола"
 
-#: class-drushfs-shipping-method.php:121
+#: class-drushfs-shipping-method.php:116
 msgid "Locations"
 msgstr "Локации"
 
-#: class-drushfs-shipping-method.php:126
+#: class-drushfs-shipping-method.php:121
 msgid "Sender"
 msgstr "Подател"
 
-#: class-drushfs-shipping-method.php:130 class-drushfs-shipping-method.php:315
+#: class-drushfs-shipping-method.php:125 class-drushfs-shipping-method.php:310
 msgid "Pickup point"
 msgstr "Пикъп точка"
 
-#: class-drushfs-shipping-method.php:133
+#: class-drushfs-shipping-method.php:128
 msgid "The warehouse Sameday collects from. Every shipment carries this id."
-msgstr "Складът, от който Sameday взима пратките. Всяка пратка носи този номер."
+msgstr ""
+"Складът, от който Sameday взима пратките. Всяка пратка носи този номер."
 
-#: class-drushfs-shipping-method.php:137
+#: class-drushfs-shipping-method.php:132
 msgid "Delivery options"
 msgstr "Начини на доставка"
 
-#: class-drushfs-shipping-method.php:141 class-drushfs-shipping-method.php:212
-#: drusoft-shipping-for-sameday.php:505
+#: class-drushfs-shipping-method.php:136 class-drushfs-shipping-method.php:207
+#: drusoft-shipping-for-sameday.php:568
 msgid "To an address"
 msgstr "До адрес"
 
-#: class-drushfs-shipping-method.php:143
+#: class-drushfs-shipping-method.php:138
 msgid "Offer delivery to the customer's address (24H)"
 msgstr "Предлагай доставка до адреса на клиента (24H)"
 
-#: class-drushfs-shipping-method.php:147 class-drushfs-shipping-method.php:219
-#: drusoft-shipping-for-sameday.php:506
+#: class-drushfs-shipping-method.php:142 class-drushfs-shipping-method.php:214
+#: drusoft-shipping-for-sameday.php:569
 msgid "To an easybox"
 msgstr "До easybox"
 
-#: class-drushfs-shipping-method.php:149
+#: class-drushfs-shipping-method.php:144
 msgid "Offer delivery to an easybox locker (Locker NextDay)"
 msgstr "Предлагай доставка до автомат easybox (Locker NextDay)"
 
-#: class-drushfs-shipping-method.php:153 class-drushfs-shipping-method.php:226
-#: drusoft-shipping-for-sameday.php:507
+#: class-drushfs-shipping-method.php:148 class-drushfs-shipping-method.php:221
+#: drusoft-shipping-for-sameday.php:570
 msgid "To a SAMEDAY point"
 msgstr "До SAMEDAY point"
 
-#: class-drushfs-shipping-method.php:155
+#: class-drushfs-shipping-method.php:150
 msgid "Offer delivery to a SAMEDAY point (PUDO)"
 msgstr "Предлагай доставка до SAMEDAY point (PUDO)"
 
-#: class-drushfs-shipping-method.php:157
-msgid "Hidden automatically while Sameday lists no SAMEDAY point in the customer's country."
-msgstr "Скрива се автоматично, докато Sameday няма SAMEDAY point в държавата на клиента."
+#: class-drushfs-shipping-method.php:152
+msgid ""
+"Hidden automatically while Sameday lists no SAMEDAY point in the customer's "
+"country."
+msgstr ""
+"Скрива се автоматично, докато Sameday няма SAMEDAY point в държавата на "
+"клиента."
 
-#: class-drushfs-shipping-method.php:161
+#: class-drushfs-shipping-method.php:156
 msgid "Waybills"
 msgstr "Товарителници"
 
-#: class-drushfs-shipping-method.php:165
+#: class-drushfs-shipping-method.php:160
 msgid "Create automatically"
 msgstr "Създавай автоматично"
 
-#: class-drushfs-shipping-method.php:167
+#: class-drushfs-shipping-method.php:162
 msgid "Create the Sameday waybill when an order becomes Processing or On hold"
-msgstr "Създавай товарителница в Sameday, когато поръчката стане „Обработва се“ или „Задържана“"
+msgstr ""
+"Създавай товарителница в Sameday, когато поръчката стане „Обработва се“ или "
+"„Задържана“"
 
-#: class-drushfs-shipping-method.php:169
-msgid "Off: create each waybill by hand from the order screen. An order that already has a waybill is never given a second one."
-msgstr "Изключено: всяка товарителница се създава ръчно от екрана на поръчката. Поръчка, която вече има товарителница, никога не получава втора."
+#: class-drushfs-shipping-method.php:164
+msgid ""
+"Off: create each waybill by hand from the order screen. An order that "
+"already has a waybill is never given a second one."
+msgstr ""
+"Изключено: всяка товарителница се създава ръчно от екрана на поръчката. "
+"Поръчка, която вече има товарителница, никога не получава втора."
 
-#: class-drushfs-shipping-method.php:173
+#: class-drushfs-shipping-method.php:168
 msgid "Parcel"
 msgstr "Пратка"
 
-#: class-drushfs-shipping-method.php:177
+#: class-drushfs-shipping-method.php:172
 msgid "Default weight (kg)"
 msgstr "Тегло по подразбиране (кг)"
 
-#: class-drushfs-shipping-method.php:185
+#: class-drushfs-shipping-method.php:180
 msgid "Used when a product carries no weight."
 msgstr "Използва се, когато продуктът няма зададено тегло."
 
-#: class-drushfs-shipping-method.php:189
+#: class-drushfs-shipping-method.php:184
 msgid "Declared value"
 msgstr "Обявена стойност"
 
-#: class-drushfs-shipping-method.php:192
+#: class-drushfs-shipping-method.php:187
 msgid "Never declare a value"
 msgstr "Без обявена стойност"
 
-#: class-drushfs-shipping-method.php:193
+#: class-drushfs-shipping-method.php:188
 msgid "Declare above a threshold"
 msgstr "Обявявай над праг"
 
-#: class-drushfs-shipping-method.php:194
+#: class-drushfs-shipping-method.php:189
 msgid "Always declare the order value"
 msgstr "Винаги обявявай стойността на поръчката"
 
-#: class-drushfs-shipping-method.php:197
-msgid "Insurance costs 0.5% of the declared value. Without it Sameday's liability is capped low."
-msgstr "Застраховката струва 0,5% от обявената стойност. Без нея отговорността на Sameday е ограничена до ниска сума."
+#: class-drushfs-shipping-method.php:192
+msgid ""
+"Insurance costs 0.5% of the declared value. Without it Sameday's liability "
+"is capped low."
+msgstr ""
+"Застраховката струва 0,5% от обявената стойност. Без нея отговорността на "
+"Sameday е ограничена до ниска сума."
 
-#: class-drushfs-shipping-method.php:201
+#: class-drushfs-shipping-method.php:196
 msgid "Declare from (order total)"
 msgstr "Обявявай от (сума на поръчката)"
 
-#: class-drushfs-shipping-method.php:207
+#: class-drushfs-shipping-method.php:202
 msgid "Fallback prices"
 msgstr "Резервни цени"
 
-#: class-drushfs-shipping-method.php:209
-msgid "Used only when Sameday cannot be reached, so checkout still shows a price. Enter what the contract charges, including any surcharges."
-msgstr "Използват се само когато Sameday не отговаря, за да има цена при поръчка. Въведете цените по договора, включително надбавките."
+#: class-drushfs-shipping-method.php:204
+msgid ""
+"Used only when Sameday cannot be reached, so checkout still shows a price. "
+"Enter what the contract charges, including any surcharges."
+msgstr ""
+"Използват се само когато Sameday не отговаря, за да има цена при поръчка. "
+"Въведете цените по договора, включително надбавките."
 
-#: class-drushfs-shipping-method.php:233
+#: class-drushfs-shipping-method.php:228
 msgid "Per extra kg"
 msgstr "За всеки допълнителен кг"
 
-#: class-drushfs-shipping-method.php:238
+#: class-drushfs-shipping-method.php:233
 msgid "Added for every kilogram above three."
 msgstr "Добавя се за всеки килограм над три."
 
-#: class-drushfs-shipping-method.php:261
-msgid "Locations have never been refreshed yet. They arrive once credentials are saved."
-msgstr "Локациите още не са обновявани. Ще се заредят след записване на данните за достъп."
+#: class-drushfs-shipping-method.php:256
+msgid ""
+"Locations have never been refreshed yet. They arrive once credentials are "
+"saved."
+msgstr ""
+"Локациите още не са обновявани. Ще се заредят след записване на данните за "
+"достъп."
 
 #. translators: 1: date and time, 2: age such as "3 hours", 3: locker count, 4: city count
-#: class-drushfs-shipping-method.php:271
+#: class-drushfs-shipping-method.php:266
 #, php-format
 msgid "Last refreshed %1$s (%2$s ago): %3$d pickup locations, %4$d cities."
-msgstr "Последно обновяване %1$s (преди %2$s): %3$d места за получаване, %4$d населени места."
+msgstr ""
+"Последно обновяване %1$s (преди %2$s): %3$d места за получаване, %4$d "
+"населени места."
 
-#: class-drushfs-shipping-method.php:279
+#: class-drushfs-shipping-method.php:274
 msgid "That is more than three days — the daily refresh may not be running."
-msgstr "Това е преди повече от три дни — ежедневното обновяване може да не работи."
+msgstr ""
+"Това е преди повече от три дни — ежедневното обновяване може да не работи."
 
-#: class-drushfs-shipping-method.php:293
+#: class-drushfs-shipping-method.php:288
 msgid "Save your credentials first"
 msgstr "Първо запишете данните за достъп"
 
-#: class-drushfs-shipping-method.php:325
+#: class-drushfs-shipping-method.php:320
 msgid "Sameday returned no pickup points"
 msgstr "Sameday не върна пикъп точки"
 
 #. translators: %s: error message from Sameday.
-#: class-drushfs-shipping-method.php:368
+#: class-drushfs-shipping-method.php:363
 #, php-format
 msgid "Sameday rejected these credentials: %s"
 msgstr "Sameday отхвърли данните за достъп: %s"
 
-#: class-drushfs-shipping-method.php:375
+#: class-drushfs-shipping-method.php:370
 msgid "Sameday credentials accepted."
 msgstr "Данните за достъп до Sameday са приети."
 
-#: class-drushfs-shipping-method.php:439
+#: class-drushfs-shipping-method.php:528
 msgid "Sameday — to an address"
 msgstr "Sameday — до адрес"
 
-#: class-drushfs-shipping-method.php:443
+#: class-drushfs-shipping-method.php:532
 msgid "Sameday — to an easybox"
 msgstr "Sameday — до easybox"
 
-#: class-drushfs-shipping-method.php:447
+#: class-drushfs-shipping-method.php:536
 msgid "Sameday — to a SAMEDAY point"
 msgstr "Sameday — до SAMEDAY point"
 
-#: class-drushfs-shipping-method.php:591
+#: class-drushfs-shipping-method.php:675
 msgid "Recipient"
 msgstr "Получател"
 
-#: drusoft-shipping-for-sameday.php:504
+#: drusoft-shipping-for-sameday.php:567
 msgid "Delivery method"
 msgstr "Начин на доставка"
 
-#: drusoft-shipping-for-sameday.php:508 drusoft-shipping-for-sameday.php:514
+#: drusoft-shipping-for-sameday.php:571 drusoft-shipping-for-sameday.php:579
 msgid "Choose an easybox"
 msgstr "Изберете easybox"
 
-#: drusoft-shipping-for-sameday.php:509 drusoft-shipping-for-sameday.php:515
+#: drusoft-shipping-for-sameday.php:572 drusoft-shipping-for-sameday.php:580
 msgid "Choose a SAMEDAY point"
 msgstr "Изберете SAMEDAY point"
 
-#: drusoft-shipping-for-sameday.php:510
+#: drusoft-shipping-for-sameday.php:573
 msgid "Choose on the map"
 msgstr "Избери от картата"
 
-#: drusoft-shipping-for-sameday.php:511
+#: drusoft-shipping-for-sameday.php:574
+msgid "Choose a city..."
+msgstr "Изберете град..."
+
+#: drusoft-shipping-for-sameday.php:575
+msgid "Please choose a city first."
+msgstr "Моля, първо изберете град."
+
+#: drusoft-shipping-for-sameday.php:576
 msgid "Searching…"
 msgstr "Търсене…"
 
-#: drusoft-shipping-for-sameday.php:512
+#: drusoft-shipping-for-sameday.php:577
 msgid "No results"
 msgstr "Няма резултати"
 
-#: drusoft-shipping-for-sameday.php:513
+#: drusoft-shipping-for-sameday.php:578
 msgid "Please choose a pickup location."
 msgstr "Моля, изберете място за доставка."
 
-#: drusoft-shipping-for-sameday.php:516
+#: drusoft-shipping-for-sameday.php:581
 msgid "Click a marker, then choose “Select this location”."
 msgstr "Щракнете върху маркер и изберете „Избери това място“."
 
-#: drusoft-shipping-for-sameday.php:517
+#: drusoft-shipping-for-sameday.php:582
 msgid "Select this location"
 msgstr "Избери това място"
 
-#: drusoft-shipping-for-sameday.php:518
+#: drusoft-shipping-for-sameday.php:583
 msgid "The map could not be loaded:"
 msgstr "Картата не можа да се зареди:"
 
-#: drusoft-shipping-for-sameday.php:521 drusoft-shipping-for-sameday.php:788
+#: drusoft-shipping-for-sameday.php:586 drusoft-shipping-for-sameday.php:853
 msgid "SAMEDAY point"
 msgstr "SAMEDAY point"
 
-#: drusoft-shipping-for-sameday.php:522
+#: drusoft-shipping-for-sameday.php:587
 msgid "easybox"
 msgstr "easybox"
 
-#: drusoft-shipping-for-sameday.php:523
+#: drusoft-shipping-for-sameday.php:588
 msgid "All"
 msgstr "Всички"
 
-#: drusoft-shipping-for-sameday.php:524
+#: drusoft-shipping-for-sameday.php:589
 msgid "Search by name, city or address…"
 msgstr "Търсене по име, град или адрес…"
 
-#: drusoft-shipping-for-sameday.php:525
+#: drusoft-shipping-for-sameday.php:590
 msgid "{n} results"
 msgstr "{n} резултата"
 
-#: drusoft-shipping-for-sameday.php:526
+#: drusoft-shipping-for-sameday.php:591
 msgid "No matches"
 msgstr "Няма съвпадения"
 
-#: drusoft-shipping-for-sameday.php:681
+#: drusoft-shipping-for-sameday.php:746
 msgid "Please correct your credentials and save again."
 msgstr "Моля, коригирайте данните си и запишете отново."
 
-#: drusoft-shipping-for-sameday.php:789
+#: drusoft-shipping-for-sameday.php:854
 msgid "Sameday easybox"
 msgstr "Sameday easybox"
 
-#: drusoft-shipping-for-sameday.php:793
+#: drusoft-shipping-for-sameday.php:858
 msgid "Pickup location not found locally — wait for the daily refresh."
-msgstr "Мястото за получаване не е намерено локално — изчакайте ежедневното обновяване."
+msgstr ""
+"Мястото за получаване не е намерено локално — изчакайте ежедневното "
+"обновяване."
 
-#: drusoft-shipping-for-sameday.php:834 drusoft-shipping-for-sameday.php:858
-#: drusoft-shipping-for-sameday.php:862
+#: drusoft-shipping-for-sameday.php:899 drusoft-shipping-for-sameday.php:923
+#: drusoft-shipping-for-sameday.php:927
 msgid "Parcel tracking"
 msgstr "Проследяване на пратката"
 
-#: drusoft-shipping-for-sameday.php:835 drusoft-shipping-for-sameday.php:859
-#: drusoft-shipping-for-sameday.php:863
+#: drusoft-shipping-for-sameday.php:900 drusoft-shipping-for-sameday.php:924
+#: drusoft-shipping-for-sameday.php:928
 msgid "Waybill number"
 msgstr "Номер на товарителница"
 
-#: drusoft-shipping-for-sameday.php:836 drusoft-shipping-for-sameday.php:864
+#: drusoft-shipping-for-sameday.php:901 drusoft-shipping-for-sameday.php:929
 msgid "Track your parcel with Sameday"
 msgstr "Проследи пратката в Sameday"
 
-#: drusoft-shipping-for-sameday.php:880 drusoft-shipping-for-sameday.php:923
+#: drusoft-shipping-for-sameday.php:945 drusoft-shipping-for-sameday.php:988
 #: includes/admin/class-drushfs-actions.php:38
 #: includes/admin/class-drushfs-actions.php:71
 #: includes/admin/class-drushfs-actions.php:120
 msgid "Permission denied."
 msgstr "Достъпът е отказан."
 
-#: drusoft-shipping-for-sameday.php:957
+#: drusoft-shipping-for-sameday.php:1022
 msgid "Shipping method class not found."
 msgstr "Класът на метода за доставка не е намерен."
 
-#: drusoft-shipping-for-sameday.php:1162 drusoft-shipping-for-sameday.php:1218
+#: drusoft-shipping-for-sameday.php:1096 drusoft-shipping-for-sameday.php:1152
 msgid "Sameday pickup point"
 msgstr "Пикъп точка на Sameday"
 
-#: drusoft-shipping-for-sameday.php:1165
-msgid "Where Sameday collects this product from (e.g. a supplier warehouse for dropshipping)."
-msgstr "Откъде Sameday взима този продукт (напр. склад на доставчик при дропшипинг)."
+#: drusoft-shipping-for-sameday.php:1099
+msgid ""
+"Where Sameday collects this product from (e.g. a supplier warehouse for "
+"dropshipping)."
+msgstr ""
+"Откъде Sameday взима този продукт (напр. склад на доставчик при дропшипинг)."
 
 #. translators: %d: number of parcels
-#: drusoft-shipping-for-sameday.php:1201
+#: drusoft-shipping-for-sameday.php:1135
 #, php-format
 msgid "Split shipment: %d parcels, one per pickup point (see order notes)."
-msgstr "Разделена пратка: %d колета, по един за всяка пикъп точка (вижте бележките към поръчката)."
+msgstr ""
+"Разделена пратка: %d колета, по един за всяка пикъп точка (вижте бележките "
+"към поръчката)."
 
-#: drusoft-shipping-for-sameday.php:1231
-msgid "Mixed pickup points — items come from different origins; consolidate before creating the waybill (see order notes)."
-msgstr "Различни пикъп точки — артикулите идват от различни места; обединете ги преди създаване на товарителницата (вижте бележките към поръчката)."
+#: drusoft-shipping-for-sameday.php:1165
+msgid ""
+"Mixed pickup points — items come from different origins; consolidate before "
+"creating the waybill (see order notes)."
+msgstr ""
+"Различни пикъп точки — артикулите идват от различни места; обединете ги "
+"преди създаване на товарителницата (вижте бележките към поръчката)."
 
-#: drusoft-shipping-for-sameday.php:1348
+#: drusoft-shipping-for-sameday.php:1282
 msgid "Missing region code"
 msgstr "Липсва код на регион"
 
-#: drusoft-shipping-for-sameday.php:1358
+#: drusoft-shipping-for-sameday.php:1289
 msgid "Unknown region code"
 msgstr "Непознат код на регион"
 
-#: drusoft-shipping-for-sameday.php:1437
+#: drusoft-shipping-for-sameday.php:1347 drusoft-shipping-for-sameday.php:1365
+msgid "Missing city"
+msgstr "Липсва град"
+
+#: drusoft-shipping-for-sameday.php:1457
 msgid "Please choose a SAMEDAY point."
 msgstr "Моля, изберете SAMEDAY point."
 
-#: drusoft-shipping-for-sameday.php:1438
+#: drusoft-shipping-for-sameday.php:1458
 msgid "Please choose an easybox."
 msgstr "Моля, изберете easybox."
 
@@ -585,6 +644,6 @@ msgstr "Създадена товарителница в Sameday: %1$s (%2$s)."
 msgid "No Sameday pickup point is configured."
 msgstr "Не е настроена пикъп точка на Sameday."
 
-#: includes/class-drushfs-waybill-generator.php:207
+#: includes/class-drushfs-waybill-generator.php:210
 msgid "This order is set for locker delivery but carries no locker choice."
 msgstr "Поръчката е за доставка до автомат, но няма избран автомат."

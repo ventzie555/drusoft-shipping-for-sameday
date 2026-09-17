@@ -1,13 +1,13 @@
 /* Drusoft Shipping for Sameday Checkout Styles */
 
 /* Reduce font size ONLY for the easybox / SAMEDAY point dropdown */
-#sameday-point-field .select2-container .select2-selection--single {
+#sameday-office-field .select2-container .select2-selection--single {
     height: 32px; /* Standard WC height is usually around 40px, reducing slightly */
     display: flex;
     align-items: center;
 }
 
-#sameday-point-field .select2-container--default .select2-selection--single .select2-selection__rendered {
+#sameday-office-field .select2-container--default .select2-selection--single .select2-selection__rendered {
     font-size: 13px; /* Smaller font for long addresses */
     line-height: 1.2; /* Allow multi-line if needed, or tight single line */
     padding-left: 8px;
@@ -20,7 +20,7 @@
 }
 
 /* Center the arrow vertically */
-#sameday-point-field .select2-container--default .select2-selection--single .select2-selection__arrow {
+#sameday-office-field .select2-container--default .select2-selection--single .select2-selection__arrow {
     height: 30px;
     top: 1px;
 }

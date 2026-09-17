@@ -3,7 +3,7 @@ Contributors: ventzie
 Tags: woocommerce, shipping, sameday, easybox, bulgaria
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 0.1.0
+Stable tag: 0.2.1
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -22,8 +22,9 @@ This plugin is currently **not compatible** with the WooCommerce Block Cart and 
 
 * **Three delivery options** — to an address (24H), to an easybox locker, or to a SAMEDAY point.
 * **Live prices** — each option is priced by Sameday for the actual parcel, city and payment method.
-* **Easybox search** — a searchable list of pickup locations, nearest to the customer's city first.
-* **Map picker** — choose an easybox or SAMEDAY point on a map, with filters and search.
+* **City list** — the customer picks a region, then a city from a searchable list (Latin or Cyrillic); the postcode fills itself.
+* **Only what the city has** — easybox and SAMEDAY point are offered only in cities that have one, with a searchable list of that city's locations.
+* **Map picker** — choose one of the city's easyboxes or SAMEDAY points on a map, with filters and search.
 * **Full lockers hidden** — locations Sameday reports as over capacity are not offered.
 
 = For Merchants =
@@ -72,7 +73,7 @@ Each delivery option is priced live by Sameday's `estimate-cost` endpoint for th
 
 = Why is the SAMEDAY point option missing at checkout? =
 
-The option hides itself while Sameday lists no SAMEDAY point in the customer's country, rather than showing an empty list.
+Each pickup option appears only when the customer's city has such a location. A city with no SAMEDAY point offers address delivery and, if it has one, easybox.
 
 = Can I automatically generate waybills? =
 
@@ -153,9 +154,15 @@ This plugin communicates with one host per environment:
 * **Local database tables** — Cities and pickup locations are synced once per day and queried locally.
 * **Token caching** — One authentication per token lifetime rather than one per request.
 * **Quote caching** — Prices are cached for 15 minutes per shipment shape.
-* **Map data** — The full pickup-location list is cached for an hour and loaded once per checkout.
+* **Map data** — Pickup locations are loaded per city, and coordinates only when the customer opens the map.
 
 == Changelog ==
+
+= 0.2.1 =
+* Checkout now follows the same flow as Drusoft Shipping for Speedy and Econt: region, city list with automatic postcode, then only the delivery options the chosen city has, with a pickup list and map limited to that city.
+* No price is shown until a city is chosen.
+* Service ids are resolved by service code, because they differ between the demo and production environments.
+* Quotes no longer fall back to the price table before the customer has typed a street.
 
 = 0.1.0 =
 * First version: live pricing for address, easybox and SAMEDAY point delivery; searchable pickup list and map picker; daily location sync; waybill creation (manual or automatic), label printing and cancellation; fallback prices; Bulgarian translation.

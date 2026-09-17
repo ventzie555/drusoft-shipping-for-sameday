@@ -154,6 +154,14 @@ if ( ! class_exists( 'Drushfs_Waybill_Generator' ) ) {
 			$city   = $order->get_shipping_city() ?: $order->get_billing_city();
 			$county = $this->county_for_city( $city, $order->get_shipping_state() ?: $order->get_billing_state() );
 
+			// An order placed through the city list carries the exact city.
+			$city_id = (int) ( $order->get_meta( '_drushfs_shipping_city_id' ) ?: $order->get_meta( '_drushfs_billing_city_id' ) );
+			$row     = $city_id ? drushfs_city_row( $city_id ) : null;
+			if ( $row ) {
+				$city   = (string) $row['name'];
+				$county = (string) $row['county'];
+			}
+
 			$address = trim( $order->get_shipping_address_1() . ' ' . $order->get_shipping_address_2() );
 			if ( '' === $address ) {
 				$address = trim( $order->get_billing_address_1() . ' ' . $order->get_billing_address_2() );
