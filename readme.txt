@@ -3,7 +3,7 @@ Contributors: ventzie
 Tags: woocommerce, shipping, sameday, easybox, bulgaria
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 0.3.7
+Stable tag: 0.4.0
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -24,7 +24,7 @@ This plugin is currently **not compatible** with the WooCommerce Block Cart and 
 * **Live prices** — each option is priced by Sameday for the actual parcel, city and payment method.
 * **City list** — the customer picks a region, then a city from a searchable list (Latin or Cyrillic); the postcode fills itself.
 * **Only what the city has** — easybox and SAMEDAY point are offered only in cities that have one, with a searchable list of that city's locations.
-* **Map picker** — choose one of the city's easyboxes or SAMEDAY points on a map, with filters and search.
+* **Map picker** — a map of every easybox and SAMEDAY point in the country, opened on the customer's city, with filters and search. Picking a location elsewhere sets the region, city and delivery type by itself.
 * **Full lockers hidden** — locations Sameday reports as over capacity are not offered.
 
 = For Merchants =
@@ -154,9 +154,14 @@ This plugin communicates with one host per environment:
 * **Local database tables** — Cities and pickup locations are synced once per day and queried locally.
 * **Token caching** — One authentication per token lifetime rather than one per request.
 * **Quote caching** — Prices are cached for 15 minutes per shipment shape.
-* **Map data** — Pickup locations are loaded per city, and coordinates only when the customer opens the map.
+* **Map data** — The pickup list is loaded per city; the map's country-wide list is fetched only when the customer opens the map and is cached for an hour.
 
 == Changelog ==
+
+= 0.4.0 =
+* Map: shows the whole country and opens zoomed on the chosen city, as Drusoft Shipping for Econt does; a location picked in another city switches region, city and delivery type. The map button is available as soon as Sameday is selected.
+* Cart: keeps its region search, hidden Update button and locked postcode after a sibling courier plugin resets the shared calculator.
+* The order's second address line names the pickup location also when the choice was restored rather than re-made.
 
 = 0.3.2 =
 * Cart page: the shipping calculator now offers the same region and city list, and the same delivery-type chooser, as Drusoft Shipping for Speedy and Econt.

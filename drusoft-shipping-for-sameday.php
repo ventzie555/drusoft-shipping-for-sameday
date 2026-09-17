@@ -3,7 +3,7 @@
  * Plugin Name: Drusoft Shipping for Sameday
  * Plugin URI:  https://github.com/ventzie555/drusoft-shipping-for-sameday
  * Description: A clean, conflict-free Sameday integration for Bulgaria — live prices, easybox and address delivery, waybills and labels.
- * Version:     0.3.7
+ * Version:     0.4.0
  * Author:      DRUSOFT LTD
  * Author URI:  https://drusoft.dev/
  * Text Domain: drusoft-shipping-for-sameday
@@ -55,7 +55,7 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
  */
 define( 'DRUSHFS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DRUSHFS_URL',  plugin_dir_url( __FILE__ ) );
-define( 'DRUSHFS_VER',  '0.3.7' );
+define( 'DRUSHFS_VER',  '0.4.0' );
 
 /**
  * Load Dependencies
@@ -1326,32 +1326,38 @@ function drushfs_check_availability_ajax(): void {
 }
 
 /**
- * AJAX Handler: map points for one city, fetched only when the customer opens
- * the map picker.
+ * AJAX Handler: every pickup location in the country, for the map picker.
+ *
+ * The map shows the whole country and opens zoomed on the customer's city, as
+ * the Econt sibling's does; a pick elsewhere switches region and city, which is
+ * why each point carries its WooCommerce region code. Fetched only when the
+ * customer opens the map, and cached for an hour.
  */
-add_action( 'wp_ajax_drushfs_map_points', 'drushfs_map_points_ajax' );
-add_action( 'wp_ajax_nopriv_drushfs_map_points', 'drushfs_map_points_ajax' );
+add_action( 'wp_ajax_drushfs_get_all_points', 'drushfs_get_all_points_ajax' );
+add_action( 'wp_ajax_nopriv_drushfs_get_all_points', 'drushfs_get_all_points_ajax' );
 
-function drushfs_map_points_ajax(): void {
+function drushfs_get_all_points_ajax(): void {
 	check_ajax_referer( 'drushfs_public', 'nonce' );
 
-	$city_id = isset( $_POST['city_id'] ) ? absint( $_POST['city_id'] ) : 0;
-	if ( ! $city_id ) {
-		wp_send_json_error( __( 'Missing city', 'drusoft-shipping-for-sameday' ) );
+	$offered   = drushfs_offered_types();
+	$cache_key = 'drushfs_all_points_' . md5( wp_json_encode( $offered ) );
+	$cached    = get_transient( $cache_key );
+	if ( is_array( $cached ) ) {
+		wp_send_json_success( $cached );
 	}
 
-	$offered = drushfs_offered_types();
+	// County name as Sameday spells it => WooCommerce state code.
+	$regions = array_flip( drushfs_get_region_map() );
 
 	global $wpdb;
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 	$rows = $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT ooh_id, name, address, city, city_id, postal_code, latitude, longitude, ooh_type, supported_payment
-			   FROM {$wpdb->prefix}drushfs_lockers
-			  WHERE city_id = %d AND client_visible = 1 AND capacity_exceeded = 0
-			  ORDER BY name ASC",
-			$city_id
-		)
+		"SELECT l.ooh_id, l.name, l.address, l.city, l.city_id, l.postal_code, l.latitude, l.longitude,
+		        l.ooh_type, l.supported_payment, c.county
+		   FROM {$wpdb->prefix}drushfs_lockers l
+		   LEFT JOIN {$wpdb->prefix}drushfs_cities c ON c.id = l.city_id
+		  WHERE l.client_visible = 1 AND l.capacity_exceeded = 0
+		  ORDER BY l.city ASC, l.name ASC"
 	);
 
 	$payload = array();
@@ -1371,6 +1377,7 @@ function drushfs_map_points_ajax(): void {
 			'address'     => $row->address,
 			'city_name'   => $row->city,
 			'city_id'     => (int) $row->city_id,
+			'region_code' => $regions[ (string) $row->county ] ?? '',
 			'post_code'   => $row->postal_code,
 			'lat'         => $lat,
 			'lng'         => $lng,
@@ -1380,6 +1387,8 @@ function drushfs_map_points_ajax(): void {
 			'card'        => 1 === (int) $row->supported_payment,
 		);
 	}
+
+	set_transient( $cache_key, $payload, HOUR_IN_SECONDS );
 
 	wp_send_json_success( $payload );
 }

@@ -297,6 +297,8 @@
         function setupSamedayUI() {
             isSamedayActive = true;
             settingUp = true;
+            // Present from the first moment; later steps move it into place.
+            setTimeout(placeMapButton, 0);
 
             // A locker type chosen below writes the placeholder back.
             clearStalePlaceholder();
@@ -515,6 +517,7 @@
                 } else {
                     $('#' + currentContext + '_city_field').hide();
                 }
+                placeMapButton();
                 $(document.body).trigger('update_checkout');
             });
         }
@@ -723,6 +726,7 @@
             $newCitySelect.on('change', function() {
                 handleCityChange($(this).val());
             });
+            placeMapButton();
             
             // When called from setupSamedayUI, skip auto-trigger — the caller controls the chain.
             if (!skipAutoTrigger) {
@@ -783,6 +787,7 @@
                 $address2Field.show();
                 $address1Field.find('input').val('');
                 $address2Field.find('input').val('');
+                placeMapButton();
                 return;
             }
 
@@ -842,6 +847,7 @@
                 $address2Field.show();
                 $address1Field.find('input').val('');
                 $address2Field.find('input').val('');
+                placeMapButton();
             } else {
                 $address1Field.hide();
                 $address2Field.hide();
@@ -926,68 +932,83 @@
                 $(document.body).trigger('update_checkout');
             });
 
-            const mapBtnHtml = '<p class="form-row form-row-wide" id="sameday-map-button-wrapper" style="margin-top: 10px;">' +
+            placeMapButton();
+        }
+
+        /**
+         * Place / move the map button. Idempotent — called from every setup
+         * path so the button follows the layout. As in the Econt sibling it is
+         * there whenever Sameday is the active courier, before any city or
+         * delivery type is chosen: the map covers the whole country and a pick
+         * sets region, city and type by itself.
+         */
+        function placeMapButton() {
+            $('#sameday-map-button-wrapper').remove();
+            if (!isSamedayActive) return;
+
+            const html = '<p class="form-row form-row-wide" id="sameday-map-button-wrapper" style="margin-top: 10px;">' +
                 '<button type="button" id="sameday-open-map" class="button" style="width: 100%;">' + params.i18n.select_from_map + '</button>' +
                 '</p>';
 
-            $('#sameday-office-field').after(mapBtnHtml);
+            const $anchor = $('#sameday-office-field').length
+                ? $('#sameday-office-field')
+                : ($('#sameday-delivery-type-field').length
+                    ? $('#sameday-delivery-type-field')
+                    : $('#' + currentContext + '_city_field'));
+            $anchor.after(html);
 
-            $('#sameday-open-map').on('click', function() {
-                openSamedayMap();
+            $('#sameday-open-map').off('click.samedayMap').on('click.samedayMap', openSamedayMap);
+        }
+
+        // Every pickup location in the country, fetched once per page and only
+        // when the customer first opens the map.
+        let allPointsCache = null;
+        let allPointsPromise = null;
+
+        function fetchAllPoints() {
+            if (allPointsCache) return Promise.resolve(allPointsCache);
+            if (allPointsPromise) return allPointsPromise;
+            allPointsPromise = $.ajax({
+                url: params.ajax_url,
+                method: 'POST',
+                data: { action: 'drushfs_get_all_points', nonce: params.nonce }
+            }).then(function (response) {
+                if (response && response.success && Array.isArray(response.data)) {
+                    allPointsCache = response.data;
+                }
+                allPointsPromise = null;
+                return allPointsCache || [];
+            }, function () {
+                allPointsPromise = null;
+                return [];
             });
+            return allPointsPromise;
         }
 
         /**
          * Own Leaflet map (assets/js/map.js), the module the Speedy and Econt
-         * plugins use, showing the chosen city's pickup locations.
+         * plugins use. Like Econt's it shows the whole country, opens zoomed on
+         * the city already chosen, and lets the customer change their mind
+         * about the kind of location without reopening.
          */
         function openSamedayMap() {
-            const cityId = $('#' + currentContext + '_city').val();
-
-            if (!cityId) {
-                alert(params.i18n.alert_select_city);
-                return;
-            }
             if (!window.DrushfsMap) return;
+            const currentType = $('input[name="sameday_delivery_type"]:checked').val() || lastDeliveryType || 'address';
 
-            const currentType = $('input[name="sameday_delivery_type"]:checked').val() || 'easybox';
+            let defaultFilter = 'both';
+            let title = params.i18n.select_from_map;
+            if (currentType === 'pudo') { defaultFilter = 'office'; title = params.i18n.map_title_pudo || title; }
+            else if (currentType === 'easybox') { defaultFilter = 'automat'; title = params.i18n.map_title_easybox || title; }
 
-            // Coordinates are fetched HERE, on the click, not with the dropdown:
-            // shipping the map payload alongside every city change made Sofia's
-            // availability response 226 KB and stalled the checkout on mobile
-            // data for everyone, including the ~90% who never open the map.
-            $.ajax({
-                url: params.ajax_url,
-                type: 'POST',
-                data: { action: 'drushfs_map_points', nonce: params.nonce, city_id: cityId },
-                success: function(response) {
-                    if (!response || !response.success) return;
-                    const points = response.data || [];
-                    if (!points.length) return;
-
-                window.DrushfsMap.open(points, function(point) {
-                    const targetType = (point.office_type === 'APS') ? 'easybox' : 'pudo';
-                    const $radio = $('input[name="sameday_delivery_type"][value="' + targetType + '"]');
-                    if ($radio.length && !$radio.prop('checked')) {
-                        $radio.prop('checked', true).trigger('change');
-                    }
-                    // The office select repopulates after a type switch — retry
-                    // briefly until the picked option exists, then commit it.
-                    let tries = 0;
-                    (function commit() {
-                        const $sel = $('#sameday_office_id');
-                        if ($sel.length && $sel.find('option[value="' + point.id + '"]').length) {
-                            $sel.val(String(point.id)).trigger('change');
-                            return;
-                        }
-                        if (++tries < 15) setTimeout(commit, 200);
-                    })();
-                }, {
-                    title:         (targetTitle(currentType)),
+            fetchAllPoints().then(function (all) {
+                if (!all.length) return;
+                window.DrushfsMap.open(all, handleMapPick, {
+                    title:         title,
                     hint:          params.i18n.map_hint,
                     pickLabel:     params.i18n.map_pick,
                     errorLabel:    params.i18n.map_error,
-                    defaultFilter: (currentType === 'pudo') ? 'office' : 'automat',
+                    defaultFilter: defaultFilter,
+                    focusCityId:   $('#' + currentContext + '_city').val() || null,
                     i18n: {
                         offices:            params.i18n.map_filter_office,
                         automats:           params.i18n.map_filter_automat,
@@ -997,14 +1018,75 @@
                         search_no_results:  params.i18n.map_search_no_results,
                     },
                 });
-                }
             });
+        }
 
-            function targetTitle(type) {
-                return (type === 'pudo')
-                    ? (params.i18n.map_title_pudo || params.i18n.select_from_map)
-                    : (params.i18n.map_title_easybox || params.i18n.select_from_map);
+        // Picking a marker may require switching region + city + delivery type.
+        // Chain those changes with short polls for the dependent UI to render
+        // (the Econt sibling's handleMapPick pattern).
+        function handleMapPick(point) {
+            const targetCityId = String(point.city_id);
+            const targetRegion = point.region_code;
+            const targetType   = (point.office_type === 'APS') ? 'easybox' : 'pudo';
+
+            const $state = $('#' + currentContext + '_state');
+            const $city  = $('#' + currentContext + '_city');
+            const currentState = $state.val();
+            const currentCity  = $city.is('select') ? String($city.val() || '') : '';
+
+            function setPointId() {
+                const $sel = $('#sameday_office_id');
+                if (!$sel.length) return;
+                const targetId = String(point.id);
+                if (!$sel.find('option[value="' + targetId + '"]').length) {
+                    const label = point.name + (point.address ? ' — ' + point.address : '');
+                    $sel.append(new Option(label, point.id, true, true));
+                }
+                $sel.val(targetId).trigger('change.select2');
+                $sel.trigger('change');
             }
+
+            function setDeliveryType(done) {
+                const cur = $('input[name="sameday_delivery_type"]:checked').val();
+                if (cur === targetType && $('#sameday_office_id').length) { done(); return; }
+                $('input[name="sameday_delivery_type"][value="' + targetType + '"]').prop('checked', true).trigger('change');
+                waitFor(function () { return !!$('#sameday_office_id').length; }, done);
+            }
+
+            // Simple promise-less poll, 200ms × up to 50 (=10s).
+            function waitFor(predicate, done, attempts) {
+                attempts = (attempts === undefined) ? 50 : attempts;
+                if (predicate()) { setTimeout(done, 100); return; }
+                if (attempts <= 0) { return; }
+                setTimeout(function () { waitFor(predicate, done, attempts - 1); }, 200);
+            }
+
+            function typeRadioReady() {
+                return $('input[name="sameday_delivery_type"][value="' + targetType + '"]').length > 0;
+            }
+
+            const sameState = !targetRegion || currentState === targetRegion;
+            const sameCity  = currentCity === targetCityId;
+
+            if (sameState && sameCity) {
+                setDeliveryType(setPointId);
+                return;
+            }
+
+            if (!sameState) {
+                $state.val(targetRegion).trigger('change');
+                waitFor(function () {
+                    return $('#' + currentContext + '_city option[value="' + targetCityId + '"]').length > 0;
+                }, function () {
+                    $('#' + currentContext + '_city').val(targetCityId).trigger('change');
+                    waitFor(typeRadioReady, function () { setDeliveryType(setPointId); });
+                });
+                return;
+            }
+
+            // Same region, different city.
+            $city.val(targetCityId).trigger('change');
+            waitFor(typeRadioReady, function () { setDeliveryType(setPointId); });
         }
 
         // --- Select2 matcher (from sameday-common.js) ---

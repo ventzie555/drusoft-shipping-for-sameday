@@ -42,6 +42,11 @@ class Drushfs_Syncer {
 			update_option( 'drushfs_last_sync', time(), false );
 		}
 
+		// The map's point list is cached for an hour; fresh data should show at once.
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_drushfs\\_all\\_points\\_%' OR option_name LIKE '\\_transient\\_timeout\\_drushfs\\_all\\_points\\_%'" );
+
 		unset( $services );
 	}
 

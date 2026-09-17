@@ -21,7 +21,7 @@ Sibling plugins with the same checkout experience: [Drusoft Shipping for Speedy]
 - **Live prices** from Sameday for the real parcel, city and payment method
 - **Region → city list** (searchable in Latin or Cyrillic) that fills the postcode — the same flow as the Speedy and Econt siblings
 - **Only what the city has** — easybox and SAMEDAY point appear only where one exists
-- **Map picker** (Leaflet, bundled locally) for the chosen city, with filters and search
+- **Map picker** (Leaflet, bundled locally) of the whole country, opened on the chosen city; a pick elsewhere switches region, city and delivery type
 - **Full lockers hidden** — locations over capacity are not offered
 
 ### For merchants
