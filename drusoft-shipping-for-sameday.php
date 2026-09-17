@@ -3,7 +3,7 @@
  * Plugin Name: Drusoft Shipping for Sameday
  * Plugin URI:  https://github.com/ventzie555/drusoft-shipping-for-sameday
  * Description: A clean, conflict-free Sameday integration for Bulgaria — live prices, easybox and address delivery, waybills and labels.
- * Version:     0.3.2
+ * Version:     0.3.3
  * Author:      DRUSOFT LTD
  * Author URI:  https://drusoft.dev/
  * Text Domain: drusoft-shipping-for-sameday
@@ -55,7 +55,7 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
  */
 define( 'DRUSHFS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DRUSHFS_URL',  plugin_dir_url( __FILE__ ) );
-define( 'DRUSHFS_VER',  '0.3.2' );
+define( 'DRUSHFS_VER',  '0.3.3' );
 
 /**
  * Load Dependencies
@@ -1480,6 +1480,32 @@ function drushfs_order_city_from_id( $order ): void {
 		$order->{"set_{$addr}_city"}( $row['name'] );
 		if ( ! empty( $row['postal_code'] ) ) {
 			$order->{"set_{$addr}_postcode"}( $row['postal_code'] );
+		}
+	}
+}
+
+/**
+ * WooCommerce also saves the posted city to the customer, where the raw id
+ * then shows up on the next cart visit ("Изпращане до ... 113875, София").
+ * Store the name there too.
+ */
+add_action( 'woocommerce_checkout_update_customer', 'drushfs_customer_city_from_id', 10, 2 );
+function drushfs_customer_city_from_id( $customer, $data ): void {
+	$chosen = WC()->session ? (array) WC()->session->get( 'chosen_shipping_methods', array() ) : array();
+	if ( ! $customer instanceof WC_Customer || 0 !== strpos( (string) ( $chosen[0] ?? '' ), 'drushfs_sameday' ) ) {
+		return;
+	}
+	unset( $data );
+
+	foreach ( array( 'billing', 'shipping' ) as $addr ) {
+		$value = (string) $customer->{"get_{$addr}_city"}();
+		if ( '' === $value || ! ctype_digit( $value ) ) {
+			continue;
+		}
+		$row = drushfs_city_row( (int) $value );
+		if ( $row ) {
+			$customer->{"set_{$addr}_city"}( $row['name'] );
+			$customer->{"set_{$addr}_postcode"}( $row['postal_code'] );
 		}
 	}
 }
