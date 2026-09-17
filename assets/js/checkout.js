@@ -474,8 +474,19 @@ jQuery(function ($) {
         settingUp = false;
     }
 
+    // WooCommerce pre-fills the street from the customer's last order. After a
+    // locker order that is our placeholder, and on a page that opens with
+    // another courier selected we were never active to clean it up.
+    function clearStalePlaceholder() {
+        var $address1 = $('#' + context + '_address_1');
+        if ([params.i18n.to_easybox, params.i18n.to_pudo].indexOf($address1.val()) !== -1) {
+            $address1.val('');
+        }
+    }
+
     function teardown() {
         if (!isActive) {
+            clearStalePlaceholder();
             return;
         }
         isActive = false;
