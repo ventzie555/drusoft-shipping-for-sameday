@@ -3,7 +3,7 @@ Contributors: ventzie
 Tags: woocommerce, shipping, sameday, easybox, bulgaria
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 0.2.2
+Stable tag: 0.3.2
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -157,6 +157,11 @@ This plugin communicates with one host per environment:
 * **Map data** — Pickup locations are loaded per city, and coordinates only when the customer opens the map.
 
 == Changelog ==
+
+= 0.3.2 =
+* Cart page: the shipping calculator now offers the same region and city list, and the same delivery-type chooser, as Drusoft Shipping for Speedy and Econt.
+* The delivery type chosen on the cart is kept when the checkout opens.
+* The cart city list re-applies itself if a sibling courier plugin resets the shared city field.
 
 = 0.2.2 =
 * A quote in a currency other than the shop's is ignored and the fallback price used. Sameday's demo environment quotes in Romanian lei.
