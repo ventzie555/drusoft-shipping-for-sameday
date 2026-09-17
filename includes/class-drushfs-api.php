@@ -287,6 +287,42 @@ class Drushfs_Api {
 	}
 
 	/**
+	 * Service id for a delivery type on this account.
+	 *
+	 * Ids are not stable across environments (PUDO is 48 on demo, 57 on
+	 * production), but the serviceCode is: 24 = address, LN = locker,
+	 * PP = PUDO. The code-to-id map is cached for a day per account.
+	 *
+	 * @param array  $creds Credentials.
+	 * @param string $type  'address', 'easybox' or 'pudo'.
+	 * @return int
+	 */
+	public static function service_for_type( array $creds, string $type ): int {
+		$codes    = array( 'address' => '24', 'easybox' => 'LN', 'pudo' => 'PP' );
+		$defaults = array( '24' => 7, 'LN' => 15, 'PP' => 57 );
+		$code     = $codes[ $type ] ?? '24';
+
+		$key = 'drushfs_services_' . md5( ( $creds['sameday_username'] ?? '' ) . '|' . self::host( $creds ) );
+		$map = get_transient( $key );
+
+		if ( ! is_array( $map ) ) {
+			$map      = array();
+			$response = self::services( $creds );
+			if ( ! is_wp_error( $response ) ) {
+				foreach ( (array) ( $response['data'] ?? array() ) as $service ) {
+					if ( isset( $service['serviceCode'], $service['id'] ) ) {
+						$map[ (string) $service['serviceCode'] ] = (int) $service['id'];
+					}
+				}
+			}
+			// An empty map after a failed call is retried in ten minutes, not a day.
+			set_transient( $key, $map, $map ? DAY_IN_SECONDS : 10 * MINUTE_IN_SECONDS );
+		}
+
+		return (int) ( $map[ $code ] ?? $defaults[ $code ] );
+	}
+
+	/**
 	 * Our own warehouses; the pickup point id is required on every shipment.
 	 *
 	 * @param array $creds Credentials.

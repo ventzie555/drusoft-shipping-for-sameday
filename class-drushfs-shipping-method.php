@@ -31,11 +31,6 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 	 */
 	class Drushfs_Shipping_Method extends WC_Shipping_Method {
 
-		/** Service ids as returned by GET /api/client/services for a BG account. */
-		const SERVICE_ADDRESS = 7;
-		const SERVICE_LOCKER  = 15;
-		const SERVICE_PUDO    = 48;
-
 		/** oohType values in the lockers table. */
 		const OOH_EASYBOX = 0;
 		const OOH_PUDO    = 1;
@@ -549,7 +544,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 
 			$quote = null;
 
-			$payload = $this->build_payload( $type, $package, $weight, $cod, $value );
+			$payload = $this->build_payload( $type, $package, $weight, $cod, $value, $creds );
 			if ( $payload ) {
 				$response = Drushfs_Api::estimate( $creds, $payload );
 
@@ -605,7 +600,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 		 * @param float  $value   Declared value.
 		 * @return array Empty when the shipment cannot be described yet.
 		 */
-		private function build_payload( string $type, array $package, float $weight, float $cod, float $value ): array {
+		private function build_payload( string $type, array $package, float $weight, float $cod, float $value, array $creds ): array {
 			$pickup = (int) $this->get_option( 'pickup_point', 0 );
 			if ( ! $pickup ) {
 				return array();
@@ -617,12 +612,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 				return array();
 			}
 
-			$service = self::SERVICE_ADDRESS;
-			if ( 'easybox' === $type ) {
-				$service = self::SERVICE_LOCKER;
-			} elseif ( 'pudo' === $type ) {
-				$service = self::SERVICE_PUDO;
-			}
+			$service = Drushfs_Api::service_for_type( $creds, $type );
 
 			$payload = array(
 				'pickupPoint'      => $pickup,

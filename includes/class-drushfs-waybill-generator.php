@@ -100,7 +100,7 @@ if ( ! class_exists( 'Drushfs_Waybill_Generator' ) ) {
 				return new WP_Error( 'no_credentials', __( 'Sameday credentials are not configured.', 'drusoft-shipping-for-sameday' ) );
 			}
 
-			$payload = $this->build_payload( $order );
+			$payload = $this->build_payload( $order, $creds );
 			if ( is_wp_error( $payload ) ) {
 				$order->add_order_note( __( 'Sameday waybill error: ', 'drusoft-shipping-for-sameday' ) . $payload->get_error_message() );
 				return $payload;
@@ -139,7 +139,7 @@ if ( ! class_exists( 'Drushfs_Waybill_Generator' ) ) {
 		 * @param WC_Order $order Order.
 		 * @return array|WP_Error
 		 */
-		private function build_payload( WC_Order $order ) {
+		private function build_payload( WC_Order $order, array $creds ) {
 			$settings = self::settings_for_order( $order );
 
 			$pickup = (int) ( $settings['pickup_point'] ?? 0 );
@@ -149,12 +149,7 @@ if ( ! class_exists( 'Drushfs_Waybill_Generator' ) ) {
 
 			$type = $this->delivery_type_of( $order );
 
-			$service = Drushfs_Shipping_Method::SERVICE_ADDRESS;
-			if ( 'easybox' === $type ) {
-				$service = Drushfs_Shipping_Method::SERVICE_LOCKER;
-			} elseif ( 'pudo' === $type ) {
-				$service = Drushfs_Shipping_Method::SERVICE_PUDO;
-			}
+			$service = Drushfs_Api::service_for_type( $creds, $type );
 
 			$city   = $order->get_shipping_city() ?: $order->get_billing_city();
 			$county = $this->county_for_city( $city, $order->get_shipping_state() ?: $order->get_billing_state() );
