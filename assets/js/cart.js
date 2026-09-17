@@ -192,10 +192,23 @@
      */
     function ensureCitySelect(retries) {
         if (typeof retries !== 'number') retries = 5;
-        if (!isSamedayActive || !cachedCities || !lastStateProcessed) return;
+        if (!isSamedayActive) return;
+
+        // The same sibling reset brings the calculator's "Update" button back
+        // and unlocks the postcode; both are automatic while we are active.
+        $('button[name="calc_shipping"]').hide();
+        $('#calc_shipping_postcode').prop('readonly', true).css('background-color', '#eee');
+
+        // ...and swaps our region list, which finds "София" when the customer
+        // types "sof", for WooCommerce's plain one.
+        const $state = $('select#calc_shipping_state');
+        const inst = $state.length ? $state.data('select2') : null;
+        if ($state.length && !(inst && inst.options && inst.options.options && inst.options.options.matcher === modelMatcher)) {
+            SamedayModern.initStateSelect2($state, $state.val());
+        }
 
         const $city = $('#calc_shipping_city');
-        if ($city.length && !($city.is('select') && $city.hasClass('sameday-city-select'))) {
+        if (cachedCities && lastStateProcessed && $city.length && !($city.is('select') && $city.hasClass('sameday-city-select'))) {
             replaceCalculatorCityWithSelect(cachedCities);
         }
         if (retries > 0) setTimeout(function () { ensureCitySelect(retries - 1); }, 100);
@@ -244,6 +257,7 @@
             if (state) {
                 handleCalculatorStateChange(state);
             }
+            ensureCitySelect();
         } else {
             $('#sameday-cart-selector').remove();
             resetCalculatorUI();
@@ -306,6 +320,7 @@
                 if (response.success) {
                     cachedCities = response.data;
                     replaceCalculatorCityWithSelect(response.data);
+                    ensureCitySelect();
                 }
             }
         });

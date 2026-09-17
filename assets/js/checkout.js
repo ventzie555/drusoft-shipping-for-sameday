@@ -891,6 +891,13 @@
             // Otherwisek, ensure the placeholder is shown (no office selected).
             if (lastOfficeId) {
                 $officeSelect.val(lastOfficeId).trigger('change.select2');
+                // The change handler below is what writes the location's name
+                // into the second address line, and a restore does not fire
+                // it — the order then said "До easybox" without saying which.
+                const restoredText = $officeSelect.find('option:selected').text();
+                if ($officeSelect.val() && restoredText) {
+                    $('#' + currentContext + '_address_2_field').find('input').val(restoredText);
+                }
             } else {
                 $officeSelect.val('').trigger('change.select2');
             }

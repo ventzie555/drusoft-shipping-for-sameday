@@ -125,7 +125,11 @@ if ( ! class_exists( 'Drushfs_Waybill_Generator' ) ) {
 					/* translators: 1: waybill number, 2: cost charged by Sameday */
 					__( 'Sameday waybill created: %1$s (%2$s).', 'drusoft-shipping-for-sameday' ),
 					$awb,
-					wc_price( (float) ( $response['awbCost'] ?? 0 ) )
+					// The demo environment bills in Romanian lei with test
+					// tariffs and names no currency; never dress that as euro.
+					( 'live' === ( $creds['sameday_env'] ?? 'demo' ) )
+						? wc_price( (float) ( $response['awbCost'] ?? 0 ) )
+						: number_format_i18n( (float) ( $response['awbCost'] ?? 0 ), 2 ) . ' — demo'
 				)
 			);
 			$order->save();
