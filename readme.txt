@@ -3,7 +3,7 @@ Contributors: ventzie
 Tags: woocommerce, shipping, sameday, easybox, bulgaria
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 0.5.0
+Stable tag: 0.5.1
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -158,6 +158,9 @@ This plugin communicates with one host per environment:
 * **Map data** — The pickup list is loaded per city; the map's country-wide list is fetched only when the customer opens the map and is cached for an hour.
 
 == Changelog ==
+
+= 0.5.1 =
+* Phone width: the delivery options are listed one per row, each radio beside its label (three options no longer wrap mid-pair on a stock theme); thumb-sized map button and pickup list.
 
 = 0.5.0 =
 * New setting: “Open before paying” — adds Sameday's „Отвори преди да платиш“ extra to waybills for delivery to an address (it does not exist for easybox and SAMEDAY point). The extra is found by its code, because its id differs between accounts, environments and package types.

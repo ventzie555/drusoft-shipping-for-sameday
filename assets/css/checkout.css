@@ -43,6 +43,44 @@
     vertical-align: middle;
 }
 
+/* Phone width: one option per row, each radio beside its own label. With three
+   options the inline row wrapped mid-pair on a stock theme — the third radio
+   stayed at the end of the first line and "До SAMEDAY point" dropped alone onto
+   the next (phone test, 17.09.2026). A theme that lays the wrapper out itself
+   simply overrides this. */
+@media (max-width: 600px) {
+    #sameday-delivery-type-wrapper {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 10px 8px;
+    }
+
+    #sameday-delivery-type-wrapper label {
+        margin: 0 !important;
+        padding: 4px 0;
+    }
+
+    #sameday-delivery-type-wrapper input[type="radio"] {
+        margin: 0;
+        width: 18px;
+        height: 18px;
+    }
+
+    /* A thumb-sized map button; an unstyled <button> is 21px tall. */
+    #sameday-open-map {
+        min-height: 44px;
+    }
+
+    #sameday-office-field .select2-container .select2-selection--single {
+        height: 44px;
+    }
+
+    #sameday-office-field .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 42px;
+    }
+}
+
 /* Mobile: give the map modal the full screen — a half-height map on a
    phone is unusable for picking a point. */
 /* ── Office/automat map modal ────────────────────────────── */
