@@ -135,7 +135,7 @@ jQuery(function ($) {
 
         // Delivering to a locker means the street address is irrelevant; the
         // point's own address goes on the waybill instead.
-        toggleAddressFields(!pickup);
+        toggleAddressFields(!pickup, lastType);
 
         if (pickup) {
             loadPoints();
@@ -151,19 +151,31 @@ jQuery(function ($) {
         }
     }
 
-    function toggleAddressFields(show) {
-        var fields = ['address_1', 'address_2'];
-        $.each(fields, function (_, key) {
+    // WooCommerce still requires the street when its field is hidden, so a
+    // locker order was refused with "Адрес е задължително поле" (browser test,
+    // 17.09.2026). Speedy and Econt put the delivery type into the hidden street
+    // — "До офис" / "До автомат" — and so does this: the waybill goes to the
+    // locker's own address, never to this field.
+    function toggleAddressFields(show, type) {
+        var labels = [params.i18n.to_easybox, params.i18n.to_pudo];
+        var $address1 = $('#' + context + '_address_1');
+
+        $.each(['address_1', 'address_2'], function (_, key) {
             var $field = $('#' + context + '_' + key + '_field');
-            if (!$field.length) {
-                return;
-            }
-            if (show) {
-                $field.show();
-            } else {
-                $field.hide();
+            if ($field.length) {
+                $field.toggle(!!show);
             }
         });
+
+        if (show) {
+            // Clear only our placeholder, never a street the customer typed.
+            if (labels.indexOf($address1.val()) !== -1) {
+                $address1.val('');
+            }
+            return;
+        }
+
+        $address1.val(type === 'pudo' ? params.i18n.to_pudo : params.i18n.to_easybox);
     }
 
     /* ------------------------------------------------------------------
@@ -302,12 +314,21 @@ jQuery(function ($) {
         var title = (lastType === 'pudo') ? params.i18n.map_title_pudo : params.i18n.map_title_easybox;
 
         fetchAllPoints().then(function (all) {
+            // Open zoomed to the customer's city, as the Speedy and Econt maps
+            // do. Our city field holds a name, not an id, so borrow the id from
+            // any point in that city.
+            var city = cityValue().toLowerCase();
+            var inCity = city ? all.find(function (p) {
+                return String(p.city_name || '').toLowerCase() === city;
+            }) : null;
+
             window.DrushfsMap.open(all, handleMapPick, {
                 title: title,
                 hint: params.i18n.map_hint,
                 pickLabel: params.i18n.map_pick,
                 errorLabel: params.i18n.map_error,
                 defaultFilter: filter,
+                focusCityId: inCity ? inCity.city_id : null,
                 i18n: {
                     offices: params.i18n.map_filter_office,
                     automats: params.i18n.map_filter_automat,
@@ -383,6 +404,50 @@ jQuery(function ($) {
      * Activate / deactivate
      * --------------------------------------------------------------- */
 
+    // The stock checkout order puts the street, then the city, then the region.
+    // Speedy and Econt move region and city up under the country, and a customer
+    // switching between couriers should not watch the fields jump around, so
+    // Sameday does the same. The original priorities are kept to put them back.
+    var originalPriorities = {};
+
+    function reorderFields() {
+        var $country = $('#' + context + '_country_field');
+        var $state = $('#' + context + '_state_field');
+        var $city = $('#' + context + '_city_field');
+
+        if (!originalPriorities[context]) {
+            originalPriorities[context] = {
+                state: $state.attr('data-priority'),
+                city: $city.attr('data-priority')
+            };
+        }
+
+        $state.insertAfter($country).attr('data-priority', 41);
+        $city.insertAfter($state).attr('data-priority', 42);
+        $('#sameday-delivery-type-field').insertAfter($city);
+        $('#sameday-point-field').insertAfter('#sameday-delivery-type-field');
+    }
+
+    function restoreFieldOrder() {
+        var $country = $('#' + context + '_country_field');
+        var $state = $('#' + context + '_state_field');
+        var $city = $('#' + context + '_city_field');
+        var $address1 = $('#' + context + '_address_1_field');
+        var $address2 = $('#' + context + '_address_2_field');
+        var prio = originalPriorities[context] || {};
+
+        $address1.insertAfter($country);
+        $address2.insertAfter($address1);
+        $city.insertAfter($address2.length ? $address2 : $address1);
+        if (prio.city) {
+            $city.attr('data-priority', prio.city);
+        }
+        $state.insertAfter($city);
+        if (prio.state) {
+            $state.attr('data-priority', prio.state);
+        }
+    }
+
     function setup() {
         if (settingUp) {
             return;
@@ -394,6 +459,7 @@ jQuery(function ($) {
 
         updateContext();
         renderDeliveryOptions();
+        reorderFields();
         placeMapButton();
 
         settingUp = false;
@@ -409,22 +475,41 @@ jQuery(function ($) {
         // fields out for itself. Tear down only what is ours.
         $('#sameday-delivery-type-field, #sameday-point-field, #sameday-map-button-wrapper').remove();
 
+        toggleAddressFields(true);
+
+        // Only put the stock order back when the customer left for a
+        // non-courier method. If Speedy or Econt took over, they have already
+        // laid the fields out for themselves.
         if (window.__drushfActiveCourier === 'sameday') {
             window.__drushfActiveCourier = '';
+            restoreFieldOrder();
         }
-
-        toggleAddressFields(true);
     }
 
     /* ------------------------------------------------------------------
      * Wiring
      * --------------------------------------------------------------- */
 
+    // Speedy and Econt (up to their September 2026 releases) recognise only each
+    // other: when they hand the checkout over they restore the stock field order
+    // unless the newcomer is their known sibling — so switching from Speedy to
+    // Sameday put region and city back below the street, on top of our layout.
+    // Their teardown runs in the same event as our setup, so reapply the order
+    // once it has finished.
+    function setupAndSettle() {
+        setup();
+        setTimeout(function () {
+            if (isActive) {
+                reorderFields();
+            }
+        }, 60);
+    }
+
     $(document.body).on('updated_checkout', function () {
         updateContext();
 
         if (isSamedaySelected()) {
-            setup();
+            setupAndSettle();
         } else {
             teardown();
         }
@@ -432,7 +517,7 @@ jQuery(function ($) {
 
     $(document.body).on('change', 'input[name^="shipping_method"]', function () {
         if (isSamedaySelected()) {
-            setup();
+            setupAndSettle();
         } else {
             teardown();
         }

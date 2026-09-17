@@ -388,7 +388,15 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 		 * -------------------------------------------------------------- */
 
 		/**
-		 * Offer one rate per enabled delivery type.
+		 * Offer ONE rate, priced for the delivery type the customer chose in
+		 * the checkout form.
+		 *
+		 * The first version offered a rate per type, which put three Sameday
+		 * entries in the shipping list beside one each for Speedy and Econt, and
+		 * left the list and the in-form address/easybox radios able to disagree
+		 * (the browser test on 17.09.2026 showed "easybox" ticked in the list and
+		 * "address" in the form). The siblings do it this way: one entry, the
+		 * type chosen in the form, the price following it.
 		 *
 		 * @param array $package WooCommerce package.
 		 */
@@ -398,30 +406,69 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 				return;
 			}
 
+			$enabled = $this->enabled_types( $package );
+			if ( ! $enabled ) {
+				return;
+			}
+
+			$type = $this->chosen_type( $package, array_keys( $enabled ) );
+
+			// A point picked in the form travels in the package; make it the
+			// one the quote is priced for.
+			$point = absint( $package['sameday_office_id'] ?? 0 );
+			if ( WC()->session ) {
+				WC()->session->set( 'drushfs_delivery_type', $type );
+				if ( 'address' === $type ) {
+					WC()->session->set( 'drushfs_office_id', 0 );
+				} elseif ( $point ) {
+					WC()->session->set( 'drushfs_office_id', $point );
+				}
+			}
+
 			$weight = $this->package_weight( $package );
 			$cod    = $this->cod_amount( $package );
 			$value  = $this->declared_value( $package );
 
-			foreach ( $this->enabled_types( $package ) as $type => $label ) {
-				$cost = $this->quote( $type, $package, $weight, $cod, $value, $creds );
-
-				if ( null === $cost ) {
-					continue;
-				}
-
-				$this->add_rate(
-					array(
-						'id'        => $this->rate_id_for( $type ),
-						'label'     => $label,
-						'cost'      => $cost['amount'],
-						'package'   => $package,
-						'meta_data' => array(
-							'delivery_type' => $type,
-							'priced_by'     => $cost['source'],
-						),
-					)
-				);
+			$cost = $this->quote( $type, $package, $weight, $cod, $value, $creds );
+			if ( null === $cost ) {
+				return;
 			}
+
+			$this->add_rate(
+				array(
+					'id'        => $this->get_rate_id(),
+					'label'     => $this->title,
+					'cost'      => $cost['amount'],
+					'package'   => $package,
+					'meta_data' => array(
+						'delivery_type' => $type,
+						'priced_by'     => $cost['source'],
+					),
+				)
+			);
+		}
+
+		/**
+		 * The delivery type to price: the form's choice, then the session, then
+		 * the first type this shop offers.
+		 *
+		 * @param array $package WooCommerce package.
+		 * @param array $allowed Enabled type keys.
+		 * @return string
+		 */
+		private function chosen_type( array $package, array $allowed ): string {
+			$candidates = array(
+				(string) ( $package['sameday_delivery_type'] ?? '' ),
+				WC()->session ? (string) WC()->session->get( 'drushfs_delivery_type', '' ) : '',
+			);
+
+			foreach ( $candidates as $candidate ) {
+				if ( in_array( $candidate, $allowed, true ) ) {
+					return $candidate;
+				}
+			}
+
+			return (string) reset( $allowed );
 		}
 
 		/**
