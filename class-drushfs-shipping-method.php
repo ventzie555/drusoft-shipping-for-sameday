@@ -595,7 +595,20 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			if ( $payload ) {
 				$response = Drushfs_Api::estimate( $creds, $payload );
 
-				if ( ! is_wp_error( $response ) && isset( $response['amount'] ) ) {
+				// The demo environment quotes in Romanian lei with test tariffs
+				// (23.60 "Ron" for a parcel production prices at 2.88 EUR). An
+				// amount in another currency is not a price this shop can show.
+				$currency = strtoupper( (string) ( is_array( $response ) ? ( $response['currency'] ?? '' ) : '' ) );
+				$foreign  = '' !== $currency && strtoupper( get_woocommerce_currency() ) !== $currency;
+
+				if ( $foreign && function_exists( 'wc_get_logger' ) ) {
+					wc_get_logger()->notice(
+						'Sameday quoted in ' . $currency . ', not ' . get_woocommerce_currency() . ' (' . $type . '); using the fallback table.',
+						array( 'source' => 'drusoft-shipping-for-sameday' )
+					);
+				}
+
+				if ( ! is_wp_error( $response ) && isset( $response['amount'] ) && ! $foreign ) {
 					$quote = array(
 						'amount' => round( (float) $response['amount'], 2 ),
 						'source' => 'api',
