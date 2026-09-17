@@ -157,6 +157,18 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 					'description' => __( 'Hidden automatically while Sameday lists no SAMEDAY point in the customer\'s country.', 'drusoft-shipping-for-sameday' ),
 					'desc_tip'    => true,
 				),
+				'waybill_title'    => array(
+					'title' => __( 'Waybills', 'drusoft-shipping-for-sameday' ),
+					'type'  => 'title',
+				),
+				'generate_waybill' => array(
+					'title'       => __( 'Create automatically', 'drusoft-shipping-for-sameday' ),
+					'type'        => 'checkbox',
+					'label'       => __( 'Create the Sameday waybill when an order becomes Processing or On hold', 'drusoft-shipping-for-sameday' ),
+					'default'     => 'no',
+					'description' => __( 'Off: create each waybill by hand from the order screen. An order that already has a waybill is never given a second one.', 'drusoft-shipping-for-sameday' ),
+					'desc_tip'    => true,
+				),
 				'parcel_title'     => array(
 					'title' => __( 'Parcel', 'drusoft-shipping-for-sameday' ),
 					'type'  => 'title',
