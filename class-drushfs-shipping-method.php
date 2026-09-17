@@ -66,7 +66,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			$this->init_form_fields();
 			$this->init_settings();
 
-			$this->title   = $this->get_option( 'title', __( 'Доставка със Sameday', 'drusoft-shipping-for-sameday' ) );
+			$this->title   = $this->get_option( 'title', __( 'Sameday delivery', 'drusoft-shipping-for-sameday' ) );
 			$this->enabled = $this->get_option( 'enabled', 'yes' );
 
 			add_action( 'woocommerce_update_options_shipping_' . $this->id, array( $this, 'process_admin_options' ) );
@@ -95,7 +95,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 					'title'       => __( 'Method title', 'drusoft-shipping-for-sameday' ),
 					'type'        => 'text',
 					'description' => __( 'Shown to the customer at checkout.', 'drusoft-shipping-for-sameday' ),
-					'default'     => __( 'Доставка със Sameday', 'drusoft-shipping-for-sameday' ),
+					'default'     => __( 'Sameday delivery', 'drusoft-shipping-for-sameday' ),
 					'desc_tip'    => true,
 				),
 				'sameday_env'      => array(
@@ -436,15 +436,15 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			$types = array();
 
 			if ( 'yes' === $this->get_option( 'offer_address', 'yes' ) ) {
-				$types['address'] = __( 'Sameday — до адрес', 'drusoft-shipping-for-sameday' );
+				$types['address'] = __( 'Sameday — to an address', 'drusoft-shipping-for-sameday' );
 			}
 
 			if ( 'yes' === $this->get_option( 'offer_easybox', 'yes' ) && $this->has_points( self::OOH_EASYBOX ) ) {
-				$types['easybox'] = __( 'Sameday — до easybox', 'drusoft-shipping-for-sameday' );
+				$types['easybox'] = __( 'Sameday — to an easybox', 'drusoft-shipping-for-sameday' );
 			}
 
 			if ( 'yes' === $this->get_option( 'offer_pudo', 'yes' ) && $this->has_points( self::OOH_PUDO ) ) {
-				$types['pudo'] = __( 'Sameday — до SAMEDAY point', 'drusoft-shipping-for-sameday' );
+				$types['pudo'] = __( 'Sameday — to a SAMEDAY point', 'drusoft-shipping-for-sameday' );
 			}
 
 			unset( $package );
@@ -588,7 +588,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 				'insuredValue'     => $value,
 				'thirdPartyPickup' => 0,
 				'awbRecipient'     => array(
-					'name'         => trim( (string) ( $destination['first_name'] ?? '' ) . ' ' . (string) ( $destination['last_name'] ?? '' ) ) ?: __( 'Получател', 'drusoft-shipping-for-sameday' ),
+					'name'         => trim( (string) ( $destination['first_name'] ?? '' ) . ' ' . (string) ( $destination['last_name'] ?? '' ) ) ?: __( 'Recipient', 'drusoft-shipping-for-sameday' ),
 					'phoneNumber'  => '0000000000',
 					// Sameday rejects a locker shipment with a blank recipient
 					// e-mail, and says so only deep inside its validation tree.

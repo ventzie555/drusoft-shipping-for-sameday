@@ -501,29 +501,29 @@ function drushfs_enqueue_scripts(): void {
 		'current_office_id'  => $current_office,
 		'currency_symbol'    => get_woocommerce_currency_symbol(),
 		'i18n'            => array(
-			'delivery_method'   => __( 'Начин на доставка', 'drusoft-shipping-for-sameday' ),
-			'to_address'        => __( 'До адрес', 'drusoft-shipping-for-sameday' ),
-			'to_easybox'        => __( 'До easybox', 'drusoft-shipping-for-sameday' ),
-			'to_pudo'           => __( 'До SAMEDAY point', 'drusoft-shipping-for-sameday' ),
-			'select_easybox'    => __( 'Изберете easybox', 'drusoft-shipping-for-sameday' ),
-			'select_pudo'       => __( 'Изберете SAMEDAY point', 'drusoft-shipping-for-sameday' ),
-			'select_from_map'   => __( 'Избери от картата', 'drusoft-shipping-for-sameday' ),
-			'searching'         => __( 'Търсене…', 'drusoft-shipping-for-sameday' ),
-			'no_results'        => __( 'Няма намерени', 'drusoft-shipping-for-sameday' ),
-			'alert_select_point' => __( 'Моля, изберете място за доставка.', 'drusoft-shipping-for-sameday' ),
-			'map_title_easybox' => __( 'Изберете easybox', 'drusoft-shipping-for-sameday' ),
-			'map_title_pudo'    => __( 'Изберете SAMEDAY point', 'drusoft-shipping-for-sameday' ),
-			'map_hint'          => __( 'Щракнете върху маркер и изберете „Избери това място“.', 'drusoft-shipping-for-sameday' ),
-			'map_pick'          => __( 'Избери това място', 'drusoft-shipping-for-sameday' ),
-			'map_error'         => __( 'Картата не можа да се зареди:', 'drusoft-shipping-for-sameday' ),
+			'delivery_method'   => __( 'Delivery method', 'drusoft-shipping-for-sameday' ),
+			'to_address'        => __( 'To an address', 'drusoft-shipping-for-sameday' ),
+			'to_easybox'        => __( 'To an easybox', 'drusoft-shipping-for-sameday' ),
+			'to_pudo'           => __( 'To a SAMEDAY point', 'drusoft-shipping-for-sameday' ),
+			'select_easybox'    => __( 'Choose an easybox', 'drusoft-shipping-for-sameday' ),
+			'select_pudo'       => __( 'Choose a SAMEDAY point', 'drusoft-shipping-for-sameday' ),
+			'select_from_map'   => __( 'Choose on the map', 'drusoft-shipping-for-sameday' ),
+			'searching'         => __( 'Searching…', 'drusoft-shipping-for-sameday' ),
+			'no_results'        => __( 'No results', 'drusoft-shipping-for-sameday' ),
+			'alert_select_point' => __( 'Please choose a pickup location.', 'drusoft-shipping-for-sameday' ),
+			'map_title_easybox' => __( 'Choose an easybox', 'drusoft-shipping-for-sameday' ),
+			'map_title_pudo'    => __( 'Choose a SAMEDAY point', 'drusoft-shipping-for-sameday' ),
+			'map_hint'          => __( 'Click a marker, then choose “Select this location”.', 'drusoft-shipping-for-sameday' ),
+			'map_pick'          => __( 'Select this location', 'drusoft-shipping-for-sameday' ),
+			'map_error'         => __( 'The map could not be loaded:', 'drusoft-shipping-for-sameday' ),
 			// map.js labels its two filters "offices" and "automats"; for
 			// Sameday those are the staffed points and the lockers.
 			'map_filter_office'  => __( 'SAMEDAY point', 'drusoft-shipping-for-sameday' ),
 			'map_filter_automat' => __( 'easybox', 'drusoft-shipping-for-sameday' ),
-			'map_filter_both'    => __( 'Всички', 'drusoft-shipping-for-sameday' ),
-			'map_search_placeholder' => __( 'Търсене по име, град или адрес…', 'drusoft-shipping-for-sameday' ),
-			'map_results_count'      => __( '{n} резултата', 'drusoft-shipping-for-sameday' ),
-			'map_search_no_results'  => __( 'Няма съвпадения', 'drusoft-shipping-for-sameday' ),
+			'map_filter_both'    => __( 'All', 'drusoft-shipping-for-sameday' ),
+			'map_search_placeholder' => __( 'Search by name, city or address…', 'drusoft-shipping-for-sameday' ),
+			'map_results_count'      => __( '{n} results', 'drusoft-shipping-for-sameday' ),
+			'map_search_no_results'  => __( 'No matches', 'drusoft-shipping-for-sameday' ),
 		)
 	);
 
@@ -833,7 +833,7 @@ function drushfs_order_details_tracking( $order ): void {
 	echo '<section class="drushfs-tracking" style="margin:0 0 24px">';
 	echo '<h2>' . esc_html__( 'Parcel tracking', 'drusoft-shipping-for-sameday' ) . '</h2>';
 	echo '<p>' . esc_html__( 'Waybill number', 'drusoft-shipping-for-sameday' ) . ': <strong>' . esc_html( $t['waybill'] ) . '</strong><br>';
-	echo '<a href="' . esc_url( $t['url'] ) . '" target="_blank" rel="noopener">' . esc_html__( 'Проследи пратката в Sameday', 'drusoft-shipping-for-sameday' ) . '</a></p>';
+	echo '<a href="' . esc_url( $t['url'] ) . '" target="_blank" rel="noopener">' . esc_html__( 'Track your parcel with Sameday', 'drusoft-shipping-for-sameday' ) . '</a></p>';
 	echo '</section>';
 }
 
@@ -861,7 +861,7 @@ function drushfs_email_tracking( $order, $sent_to_admin = false, $plain_text = f
 	} else {
 		echo '<h2>' . esc_html__( 'Parcel tracking', 'drusoft-shipping-for-sameday' ) . '</h2>';
 		echo '<p>' . esc_html__( 'Waybill number', 'drusoft-shipping-for-sameday' ) . ': <strong>' . esc_html( $t['waybill'] ) . '</strong><br>';
-		echo '<a href="' . esc_url( $t['url'] ) . '">' . esc_html__( 'Проследи пратката в Sameday', 'drusoft-shipping-for-sameday' ) . '</a></p>';
+		echo '<a href="' . esc_url( $t['url'] ) . '">' . esc_html__( 'Track your parcel with Sameday', 'drusoft-shipping-for-sameday' ) . '</a></p>';
 	}
 }
 
@@ -1434,8 +1434,8 @@ function drushfs_validate_checkout(): void {
 
 		if ( empty( $office_id ) ) {
 			$error_msg = ( 'pudo' === $delivery_type )
-				? __( 'Моля, изберете SAMEDAY point.', 'drusoft-shipping-for-sameday' )
-				: __( 'Моля, изберете easybox.', 'drusoft-shipping-for-sameday' );
+				? __( 'Please choose a SAMEDAY point.', 'drusoft-shipping-for-sameday' )
+				: __( 'Please choose an easybox.', 'drusoft-shipping-for-sameday' );
 			
 			wc_add_notice( $error_msg, 'error' );
 		}
