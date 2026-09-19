@@ -2,8 +2,8 @@
 Contributors: ventzie
 Tags: woocommerce, shipping, sameday, easybox, bulgaria
 Requires at least: 6.0
-Tested up to: 7.0
-Stable tag: 0.5.1
+Tested up to: 7.1
+Stable tag: 1.0.0
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -124,6 +124,13 @@ Map tiles are requested from OpenStreetMap by the customer's browser only when t
 * OpenStreetMap tile usage policy: [https://operations.osmfoundation.org/policies/tiles/](https://operations.osmfoundation.org/policies/tiles/)
 * OpenStreetMap copyright: [https://www.openstreetmap.org/copyright](https://www.openstreetmap.org/copyright)
 
+== Bundled Libraries ==
+
+The map picker uses **Leaflet 1.9.4** (https://leafletjs.com/), bundled locally in
+`assets/vendor/leaflet/` rather than loaded from a CDN, so no request leaves the visitor's
+browser until they open the map. Leaflet is distributed under the BSD 2-Clause License; its
+licence text ships alongside it at `assets/vendor/leaflet/LICENSE`.
+
 == Sameday API Endpoints ==
 
 This plugin communicates with one host per environment:
@@ -163,33 +170,12 @@ This plugin communicates with one host per environment:
 
 == Changelog ==
 
-= 0.5.1 =
-* Phone width: the delivery options are listed one per row, each radio beside its label (three options no longer wrap mid-pair on a stock theme); thumb-sized map button and pickup list.
-
-= 0.5.0 =
-* New setting: “Open before paying” — adds Sameday's „Отвори преди да платиш“ extra to waybills for delivery to an address (it does not exist for easybox and SAMEDAY point). The extra is found by its code, because its id differs between accounts, environments and package types.
-
-= 0.4.1 =
-* Location sync: follow the page count Sameday reports. A page can come back short without being the last one, and the sync stopped there, dropping most SAMEDAY points on accounts with more than a thousand locations.
-
-= 0.4.0 =
-* Map: shows the whole country and opens zoomed on the chosen city, as Drusoft Shipping for Econt does; a location picked in another city switches region, city and delivery type. The map button is available as soon as Sameday is selected.
-* Cart: keeps its region search, hidden Update button and locked postcode after a sibling courier plugin resets the shared calculator.
-* The order's second address line names the pickup location also when the choice was restored rather than re-made.
-
-= 0.3.2 =
-* Cart page: the shipping calculator now offers the same region and city list, and the same delivery-type chooser, as Drusoft Shipping for Speedy and Econt.
-* The delivery type chosen on the cart is kept when the checkout opens.
-* The cart city list re-applies itself if a sibling courier plugin resets the shared city field.
-
-= 0.2.2 =
-* A quote in a currency other than the shop's is ignored and the fallback price used. Sameday's demo environment quotes in Romanian lei.
-
-= 0.2.1 =
-* Checkout now follows the same flow as Drusoft Shipping for Speedy and Econt: region, city list with automatic postcode, then only the delivery options the chosen city has, with a pickup list and map limited to that city.
-* No price is shown until a city is chosen.
-* Service ids are resolved by service code, because they differ between the demo and production environments.
-* Quotes no longer fall back to the price table before the customer has typed a street.
-
-= 0.1.0 =
-* First version: live pricing for address, easybox and SAMEDAY point delivery; searchable pickup list and map picker; daily location sync; waybill creation (manual or automatic), label printing and cancellation; fallback prices; Bulgarian translation.
+= 1.0.0 =
+* First public release.
+* Three delivery options priced live by Sameday: to an address (24H), to an easybox and to a SAMEDAY point.
+* Region and city pickers that fill the postcode, offering only the options the chosen city actually has.
+* Searchable pickup list plus a map of every location in the country, opened on the customer's city.
+* Daily location sync through Action Scheduler; fallback prices when Sameday cannot be reached.
+* Waybills created by hand or automatically, PDF labels, cancellation and tracking links.
+* Optional "open before paying" extra on address deliveries; declared value off, above a threshold or always.
+* Demo and production environments; Bulgarian translation included.

@@ -971,7 +971,9 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 
 			$sql .= ' ORDER BY city ASC, name ASC LIMIT 200';
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+			// $sql is assembled from string literals only; every value travels in
+			// $params through $wpdb->prepare(). The table name comes from $wpdb->prefix.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 			$rows = $params ? $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A ) : $wpdb->get_results( $sql, ARRAY_A );
 
 			return (array) $rows;

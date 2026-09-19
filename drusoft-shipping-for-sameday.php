@@ -3,17 +3,17 @@
  * Plugin Name: Drusoft Shipping for Sameday
  * Plugin URI:  https://github.com/ventzie555/drusoft-shipping-for-sameday
  * Description: A clean, conflict-free Sameday integration for Bulgaria — live prices, easybox and address delivery, waybills and labels.
- * Version:     0.5.1
+ * Version:     1.0.0
  * Author:      DRUSOFT LTD
  * Author URI:  https://drusoft.dev/
  * Text Domain: drusoft-shipping-for-sameday
  * Domain Path: /languages
  * Requires at least: 6.0
- * Tested up to: 7.0
+ * Tested up to: 7.1
  * Requires PHP: 8.0
  * Requires Plugins: woocommerce
  * WC requires at least: 8.0
- * WC tested up to: 9.8
+ * WC tested up to: 11.1
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  *
@@ -55,7 +55,7 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
  */
 define( 'DRUSHFS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DRUSHFS_URL',  plugin_dir_url( __FILE__ ) );
-define( 'DRUSHFS_VER',  '0.5.1' );
+define( 'DRUSHFS_VER',  '1.0.0' );
 
 /**
  * Load Dependencies
@@ -1060,7 +1060,9 @@ function drushfs_product_pickup_field(): void {
 add_action( 'woocommerce_product_options_shipping', 'drushfs_product_pickup_field' );
 
 function drushfs_save_product_pickup_field( int $post_id ): void {
-	if ( isset( $_POST['_drushfs_pickup_profile'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WC product save handles the nonce.
+	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WC verifies the product-save nonce before this hook runs.
+	if ( isset( $_POST['_drushfs_pickup_profile'] ) ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- as above.
 		$key = sanitize_key( wp_unslash( $_POST['_drushfs_pickup_profile'] ) );
 		if ( 'default' === $key ) {
 			delete_post_meta( $post_id, '_drushfs_pickup_profile' );
@@ -1128,9 +1130,11 @@ function drushfs_admin_pickup_selector( $order ): void {
 add_action( 'woocommerce_admin_order_data_after_shipping_address', 'drushfs_admin_pickup_selector' );
 
 function drushfs_save_admin_pickup_selector( int $order_id ): void {
-	if ( isset( $_POST['drushfs_pickup_profile'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WC order save handles the nonce.
+	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WC verifies the order-save nonce before this hook runs.
+	if ( isset( $_POST['drushfs_pickup_profile'] ) ) {
 		$order = wc_get_order( $order_id );
 		if ( $order && ! $order->get_meta( '_drushfs_waybill_id' ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- as above.
 			$order->update_meta_data( '_drushfs_pickup_profile', sanitize_key( wp_unslash( $_POST['drushfs_pickup_profile'] ) ) );
 			$order->save();
 		}
