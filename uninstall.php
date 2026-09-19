@@ -42,12 +42,23 @@ function drushfs_uninstall_site(): void {
 	}
 }
 
-if ( is_multisite() ) {
-	foreach ( get_sites( array( 'fields' => 'ids', 'number' => 0 ) ) as $site_id ) {
-		switch_to_blog( (int) $site_id );
+/**
+ * Run the cleanup on every site of the installation.
+ *
+ * Wrapped in a function so the loop variable is not a global — uninstall.php is
+ * included at the top level, where globals belong to WordPress, not to us.
+ */
+function drushfs_uninstall_all_sites(): void {
+	if ( ! is_multisite() ) {
+		drushfs_uninstall_site();
+		return;
+	}
+
+	foreach ( get_sites( array( 'fields' => 'ids', 'number' => 0 ) ) as $blog_id ) {
+		switch_to_blog( (int) $blog_id );
 		drushfs_uninstall_site();
 		restore_current_blog();
 	}
-} else {
-	drushfs_uninstall_site();
 }
+
+drushfs_uninstall_all_sites();
