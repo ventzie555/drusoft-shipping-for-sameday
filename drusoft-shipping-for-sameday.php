@@ -188,9 +188,10 @@ function drushfs_deactivate(): void {
 	}
 	delete_transient( 'drushfs_sync_scheduled' );
 
-	// Drop Database Tables
-	require_once DRUSHFS_PATH . 'includes/class-drushfs-activator.php';
-	Drushfs_Activator::deactivate();
+	// The cities and locations tables deliberately SURVIVE deactivation: a shop
+	// switching the plugin off to test a conflict would otherwise come back to an
+	// empty checkout and a full re-sync. They are dropped in uninstall.php, when
+	// the plugin is actually deleted.
 }
 
 /**

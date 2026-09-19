@@ -84,6 +84,10 @@ Yes. Enable **Create automatically** in the shipping method settings. A waybill 
 
 No. That request is made by WooCommerce's own Mini-Cart block (the cart icon in the header of block themes such as Twenty Twenty-Five) when the cart itself is the classic shortcode page this plugin requires. WooCommerce builds the address from a value that is not set on that page, so it starts with the word “undefined”. It appears with every shipping plugin switched off as well, and it does not affect prices, delivery options or orders — only the header icon's item count may lag until the next page load.
 
+= What happens to my data if I deactivate or delete the plugin? =
+
+Deactivating stops the daily sync and nothing else — your settings and the synced cities and pickup locations stay, so switching the plugin back on costs nothing. Deleting the plugin removes its two tables, its settings and its cached data. Orders keep their waybill number and pickup location either way.
+
 = Can I request a courier from WordPress? =
 
 No. Sameday's client API has no courier-request endpoint. Collection follows your pickup point arrangement with Sameday, or you drop parcels into an easybox.
@@ -179,3 +183,4 @@ This plugin communicates with one host per environment:
 * Waybills created by hand or automatically, PDF labels, cancellation and tracking links.
 * Optional "open before paying" extra on address deliveries; declared value off, above a threshold or always.
 * Demo and production environments; Bulgarian translation included.
+* Deactivating the plugin keeps your settings and synced locations; they are removed only when the plugin is deleted.
