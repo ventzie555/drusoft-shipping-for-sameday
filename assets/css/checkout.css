@@ -31,43 +31,45 @@
     padding: 6px 10px;
 }
 
-/* Ensure radio buttons are aligned nicely */
+/* One delivery option per row, its radio always beside its own label.
+   The options were laid out inline, and with three of them a stock theme wrapped
+   the row BETWEEN a radio and its label: the third radio stayed at the end of the
+   first line and "До SAMEDAY point" dropped onto the next by itself (seen at both
+   phone and desktop width, 17–19.09.2026). Two columns cannot break that pair.
+   A theme that lays the wrapper out itself simply overrides these rules. */
+#sameday-delivery-type-wrapper {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 8px;
+}
+
 #sameday-delivery-type-wrapper label {
     font-weight: normal;
-    margin-right: 15px;
+    margin: 0;
     cursor: pointer;
 }
 
 #sameday-delivery-type-wrapper input[type="radio"] {
-    margin-right: 5px;
+    margin: 0;
     vertical-align: middle;
 }
 
-/* Phone width: one option per row, each radio beside its own label. With three
-   options the inline row wrapped mid-pair on a stock theme — the third radio
-   stayed at the end of the first line and "До SAMEDAY point" dropped alone onto
-   the next (phone test, 17.09.2026). A theme that lays the wrapper out itself
-   simply overrides this. */
+/* Phone width: thumb-sized targets. An unstyled <button> is 21px tall. */
 @media (max-width: 600px) {
     #sameday-delivery-type-wrapper {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        align-items: center;
         gap: 10px 8px;
     }
 
     #sameday-delivery-type-wrapper label {
-        margin: 0 !important;
         padding: 4px 0;
     }
 
     #sameday-delivery-type-wrapper input[type="radio"] {
-        margin: 0;
         width: 18px;
         height: 18px;
     }
 
-    /* A thumb-sized map button; an unstyled <button> is 21px tall. */
     #sameday-open-map {
         min-height: 44px;
     }
