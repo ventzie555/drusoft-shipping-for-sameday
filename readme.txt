@@ -3,7 +3,7 @@ Contributors: ventzie
 Tags: woocommerce, shipping, sameday, easybox, bulgaria
 Requires at least: 6.0
 Tested up to: 7.1
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -174,7 +174,7 @@ This plugin communicates with one host per environment:
 
 == Changelog ==
 
-= 1.0.0 =
+= 1.0.1 =
 * First public release.
 * Three delivery options priced live by Sameday: to an address (24H), to an easybox and to a SAMEDAY point.
 * Region and city pickers that fill the postcode, offering only the options the chosen city actually has.

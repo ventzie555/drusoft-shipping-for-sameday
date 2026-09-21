@@ -3,13 +3,12 @@
  * Plugin Name: Drusoft Shipping for Sameday
  * Plugin URI:  https://github.com/ventzie555/drusoft-shipping-for-sameday
  * Description: A clean, conflict-free Sameday integration for Bulgaria — live prices, easybox and address delivery, waybills and labels.
- * Version:     1.0.0
+ * Version:     1.0.1
  * Author:      DRUSOFT LTD
  * Author URI:  https://drusoft.dev/
  * Text Domain: drusoft-shipping-for-sameday
  * Domain Path: /languages
  * Requires at least: 6.0
- * Tested up to: 7.1
  * Requires PHP: 8.0
  * Requires Plugins: woocommerce
  * WC requires at least: 8.0
@@ -55,7 +54,7 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
  */
 define( 'DRUSHFS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DRUSHFS_URL',  plugin_dir_url( __FILE__ ) );
-define( 'DRUSHFS_VER',  '1.0.0' );
+define( 'DRUSHFS_VER',  '1.0.1' );
 
 /**
  * Load Dependencies
@@ -1050,6 +1049,7 @@ function drushfs_product_pickup_field(): void {
 	foreach ( $profiles as $key => $p ) {
 		$options[ $key ] = $p['label'];
 	}
+	wp_nonce_field( 'drushfs_save_product_pickup', 'drushfs_product_pickup_nonce' );
 	woocommerce_wp_select( [
 		'id'          => '_drushfs_pickup_profile',
 		'label'       => __( 'Sameday pickup point', 'drusoft-shipping-for-sameday' ),
@@ -1061,9 +1061,19 @@ function drushfs_product_pickup_field(): void {
 add_action( 'woocommerce_product_options_shipping', 'drushfs_product_pickup_field' );
 
 function drushfs_save_product_pickup_field( int $post_id ): void {
-	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WC verifies the product-save nonce before this hook runs.
+	// Our own nonce and capability check, rather than trusting that WooCommerce
+	// verified its own before firing this hook.
+	if ( ! isset( $_POST['drushfs_product_pickup_nonce'] ) ) {
+		return;
+	}
+	if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['drushfs_product_pickup_nonce'] ) ), 'drushfs_save_product_pickup' ) ) {
+		return;
+	}
+	if ( ! current_user_can( 'edit_post', $post_id ) ) {
+		return;
+	}
+
 	if ( isset( $_POST['_drushfs_pickup_profile'] ) ) {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- as above.
 		$key = sanitize_key( wp_unslash( $_POST['_drushfs_pickup_profile'] ) );
 		if ( 'default' === $key ) {
 			delete_post_meta( $post_id, '_drushfs_pickup_profile' );
@@ -1126,16 +1136,27 @@ function drushfs_admin_pickup_selector( $order ): void {
 			. esc_html__( 'Mixed pickup points — items come from different origins; consolidate before creating the waybill (see order notes).', 'drusoft-shipping-for-sameday' )
 			. '</span>';
 	}
+	wp_nonce_field( 'drushfs_save_order_pickup', 'drushfs_order_pickup_nonce' );
 	echo '</p>';
 }
 add_action( 'woocommerce_admin_order_data_after_shipping_address', 'drushfs_admin_pickup_selector' );
 
 function drushfs_save_admin_pickup_selector( int $order_id ): void {
-	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WC verifies the order-save nonce before this hook runs.
+	// Our own nonce and capability check, rather than trusting that WooCommerce
+	// verified its own before firing this hook.
+	if ( ! isset( $_POST['drushfs_order_pickup_nonce'] ) ) {
+		return;
+	}
+	if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['drushfs_order_pickup_nonce'] ) ), 'drushfs_save_order_pickup' ) ) {
+		return;
+	}
+	if ( ! current_user_can( 'edit_shop_order', $order_id ) && ! current_user_can( 'manage_woocommerce' ) ) {
+		return;
+	}
+
 	if ( isset( $_POST['drushfs_pickup_profile'] ) ) {
 		$order = wc_get_order( $order_id );
 		if ( $order && ! $order->get_meta( '_drushfs_waybill_id' ) ) {
-			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- as above.
 			$order->update_meta_data( '_drushfs_pickup_profile', sanitize_key( wp_unslash( $_POST['drushfs_pickup_profile'] ) ) );
 			$order->save();
 		}
