@@ -1,1 +1,3 @@
-/tests
+# Generated test artifacts — the hand-written harness in /tests IS versioned
+/tests/_output/
+/test-results/
