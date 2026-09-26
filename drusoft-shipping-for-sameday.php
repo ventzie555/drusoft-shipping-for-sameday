@@ -3,7 +3,7 @@
  * Plugin Name: Drusoft Shipping for Sameday
  * Plugin URI:  https://github.com/ventzie555/drusoft-shipping-for-sameday
  * Description: A clean, conflict-free Sameday integration for Bulgaria — live prices, easybox and address delivery, waybills and labels.
- * Version:     1.0.1
+ * Version:     1.0.2
  * Author:      DRUSOFT LTD
  * Author URI:  https://drusoft.dev/
  * Text Domain: drusoft-shipping-for-sameday
@@ -54,7 +54,7 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
  */
 define( 'DRUSHFS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DRUSHFS_URL',  plugin_dir_url( __FILE__ ) );
-define( 'DRUSHFS_VER',  '1.0.1' );
+define( 'DRUSHFS_VER',  '1.0.2' );
 
 /**
  * Load Dependencies
@@ -79,7 +79,7 @@ register_deactivation_hook( __FILE__, 'drushfs_deactivate' );
 /**
  * Run on plugin activation.
  *
- * Creates tables and schedules sync.
+ * Creates tables and schedules the location sync. Makes no remote calls.
  *
  * @return void
  */
@@ -88,20 +88,24 @@ function drushfs_activate(): void {
 	require_once DRUSHFS_PATH . 'includes/class-drushfs-activator.php';
 	Drushfs_Activator::activate();
 
-	// Schedule recurring background sync (every 24 hours via Action Scheduler).
-	// This fires regardless of whether individual runs succeed or fail.
-	// Check both global settings and per-instance settings for credentials.
-	$has_credentials = drushfs_has_credentials();
-	if ( $has_credentials ) {
-		// Run the sync NOW so tables are populated before any page load.
-		require_once DRUSHFS_PATH . 'includes/class-drushfs-api.php';
-		require_once DRUSHFS_PATH . 'includes/class-drushfs-syncer.php';
-		Drushfs_Syncer::sync();
-
-		// Schedule daily recurring refresh starting 24 h from now.
-		if ( function_exists( 'as_schedule_recurring_action' ) && ! as_next_scheduled_action( 'drushfs_sync_locations_event' ) ) {
-			as_schedule_recurring_action( time() + DAY_IN_SECONDS, DAY_IN_SECONDS, 'drushfs_sync_locations_event' );
-		}
+	// Activation NEVER contacts Sameday. It used to call Drushfs_Syncer::sync()
+	// here so the tables were populated before the first page load, but that is
+	// three sequential remote requests on a 45-second timeout: with Sameday
+	// unreachable, activation blocked for about 135 seconds. The wp.org review
+	// flagged it on 26.09.2026, and Guideline 7 forbids contacting external
+	// servers on activation regardless of how long it takes.
+	//
+	// Scheduling instead costs nothing and loses nothing: the recurring action
+	// starts a minute from now rather than in 24 h, so the tables fill almost as
+	// quickly, in the background, where a timeout delays data instead of
+	// blocking the admin. If Action Scheduler is not available yet (WooCommerce
+	// still loading), drushfs_maybe_schedule_sync() picks it up on the next
+	// admin page load — it already exists for exactly this case.
+	if ( drushfs_has_credentials()
+		&& function_exists( 'as_schedule_recurring_action' )
+		&& function_exists( 'as_next_scheduled_action' )
+		&& ! as_next_scheduled_action( 'drushfs_sync_locations_event' ) ) {
+		as_schedule_recurring_action( time() + MINUTE_IN_SECONDS, DAY_IN_SECONDS, 'drushfs_sync_locations_event' );
 	}
 }
 
