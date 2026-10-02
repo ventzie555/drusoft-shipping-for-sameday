@@ -3,7 +3,7 @@
  * Plugin Name: Drusoft Shipping for Sameday
  * Plugin URI:  https://github.com/ventzie555/drusoft-shipping-for-sameday
  * Description: A clean, conflict-free Sameday integration for Bulgaria — live prices, easybox and address delivery, waybills and labels.
- * Version:     1.0.2
+ * Version:     1.0.3
  * Author:      DRUSOFT LTD
  * Author URI:  https://drusoft.dev/
  * Text Domain: drusoft-shipping-for-sameday
@@ -54,7 +54,7 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
  */
 define( 'DRUSHFS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DRUSHFS_URL',  plugin_dir_url( __FILE__ ) );
-define( 'DRUSHFS_VER',  '1.0.2' );
+define( 'DRUSHFS_VER',  '1.0.3' );
 
 /**
  * Load Dependencies
@@ -329,19 +329,59 @@ function drushfs_offered_types(): array {
  * This forces WooCommerce to re-call calculate_shipping() instead of
  * returning a cached rate.
  */
+/**
+ * The POST of a WooCommerce cart or checkout request whose own nonce verifies,
+ * or an empty array.
+ *
+ * WooCommerce builds shipping packages on requests it has not nonce-checked
+ * (every render of the cart page calls calculate_totals()), so the package
+ * filter must not take $_POST on trust. Accepted: the checkout refresh, the
+ * cart shipping-method switch, the cart update form, the shipping calculator
+ * and the checkout submission.
+ *
+ * @return array{0: array, 1: array} [ $_POST, parsed post_data ].
+ */
+function drushfs_verified_wc_post(): array {
+	$nonces = array(
+		'security'                              => array( 'update-order-review', 'update-shipping-method' ),
+		'woocommerce-cart-nonce'                => array( 'woocommerce-cart' ),
+		'woocommerce-shipping-calculator-nonce' => array( 'woocommerce-shipping-calculator' ),
+		'_wpnonce'                              => array( 'woocommerce-cart' ),
+		'woocommerce-process-checkout-nonce'    => array( 'woocommerce-process_checkout' ),
+	);
+	$verified = false;
+	foreach ( $nonces as $field => $actions ) {
+		if ( empty( $_REQUEST[ $field ] ) || ! is_string( $_REQUEST[ $field ] ) ) {
+			continue;
+		}
+		$nonce = sanitize_text_field( wp_unslash( $_REQUEST[ $field ] ) );
+		foreach ( $actions as $action ) {
+			if ( wp_verify_nonce( $nonce, $action ) ) {
+				$verified = true;
+				break 2;
+			}
+		}
+	}
+	if ( ! $verified ) {
+		return array( array(), array() );
+	}
+
+	$post_data = array();
+	if ( ! empty( $_POST['post_data'] ) && is_string( $_POST['post_data'] ) ) {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- a URL-encoded form; parse_str() splits it and every value read from it is sanitized where it is used.
+		parse_str( wp_unslash( $_POST['post_data'] ), $post_data );
+	}
+	return array( wp_unslash( $_POST ), $post_data );
+}
+
 add_filter( 'woocommerce_cart_shipping_packages', 'drushfs_vary_package_hash' );
 function drushfs_vary_package_hash( $packages ) {
 	// Extract delivery type and office ID from the current checkout POST data
 	// so the package hash changes whenever the user switches delivery type or
 	// picks a different office/automat — forcing WC to re-call calculate_shipping.
-	$post_data = [];
-	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Called inside WC filter; nonce verified by WooCommerce.
-	if ( ! empty( $_POST['post_data'] ) ) {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- URL-encoded string; individual values sanitized below.
-		parse_str( wp_unslash( $_POST['post_data'] ), $post_data );
-	}
-	// phpcs:ignore WordPress.Security.NonceVerification.Missing
-	$merged = array_merge( $post_data, $_POST );
+	// Unverified requests contribute nothing and the session choice stands.
+	list( $posted, $post_data ) = drushfs_verified_wc_post();
+	$merged = array_merge( $post_data, $posted );
 
 	// A plain page load posts nothing: keep what the customer chose on the cart
 	// instead of silently falling back to address delivery.
@@ -683,7 +723,7 @@ function drushfs_enqueue_admin_scripts( $hook ): void {
 		return;
 	}
 
-	// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- only picks which admin screen gets the script; nothing is changed.
 	$tab = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : '';
 	if ( 'shipping' !== $tab ) {
 		return;
@@ -1458,12 +1498,17 @@ function drushfs_validate_checkout(): void {
 		return;
 	}
 
+	// WooCommerce has already refused a submission whose nonce fails; check it
+	// here too, so nothing below reads a form that was not the checkout's.
+	$nonce = isset( $_POST['woocommerce-process-checkout-nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['woocommerce-process-checkout-nonce'] ) ) : '';
+	if ( ! wp_verify_nonce( $nonce, 'woocommerce-process_checkout' ) ) {
+		return;
+	}
+
 	// Check delivery type
-	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce in woocommerce_checkout_process.
 	$delivery_type = isset( $_POST['sameday_delivery_type'] ) ? sanitize_text_field( wp_unslash( $_POST['sameday_delivery_type'] ) ) : 'address';
 
 	if ( 'easybox' === $delivery_type || 'pudo' === $delivery_type ) {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce in woocommerce_checkout_process.
 		$office_id = isset( $_POST['sameday_office_id'] ) ? sanitize_text_field( wp_unslash( $_POST['sameday_office_id'] ) ) : '';
 
 		if ( empty( $office_id ) ) {
@@ -1562,17 +1607,17 @@ function drushfs_save_order_meta( $order_id ): void {
 	if ( ! $order ) {
 		return;
 	}
+	$nonce = isset( $_POST['woocommerce-process-checkout-nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['woocommerce-process-checkout-nonce'] ) ) : '';
+	if ( ! wp_verify_nonce( $nonce, 'woocommerce-process_checkout' ) ) {
+		return;
+	}
 	$changed = false;
-	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout.
 	if ( ! empty( $_POST['sameday_delivery_type'] ) ) {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$order->update_meta_data( '_drushfs_delivery_type', sanitize_text_field( wp_unslash( $_POST['sameday_delivery_type'] ) ) );
 		$changed = true;
 	}
 
-	// phpcs:ignore WordPress.Security.NonceVerification.Missing
 	if ( ! empty( $_POST['sameday_office_id'] ) ) {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$order->update_meta_data( '_drushfs_office_id', sanitize_text_field( wp_unslash( $_POST['sameday_office_id'] ) ) );
 		$changed = true;
 	}

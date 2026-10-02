@@ -86,9 +86,9 @@ class Drushfs_Order_Metabox {
 	 */
 	private static function get_current_order(): ?WC_Order {
 		// HPOS: order ID is in the GET parameter
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only; used to display a meta box on the WC order screen.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only: identifies the order the WC edit screen is showing; nothing is changed.
 		if ( isset( $_GET['id'] ) ) {
-			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- same read-only order id as above.
 			$order = wc_get_order( absint( $_GET['id'] ) );
 			return $order ?: null;
 		}

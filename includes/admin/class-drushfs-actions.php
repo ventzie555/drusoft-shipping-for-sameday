@@ -152,7 +152,7 @@ class Drushfs_Actions {
 		header( 'Content-Type: application/pdf' );
 		header( 'Content-Disposition: inline; filename="sameday-' . sanitize_file_name( $awb ) . '.pdf"' );
 		header( 'Content-Length: ' . strlen( $pdf ) );
-		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binary PDF.
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- a binary PDF streamed as application/pdf; escaping would corrupt it. Access is checked above (manage_woocommerce + check_admin_referer).
 		echo $pdf;
 		exit;
 	}

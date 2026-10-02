@@ -3,7 +3,7 @@ Contributors: ventzie
 Tags: woocommerce, shipping, sameday, easybox, bulgaria
 Requires at least: 6.0
 Tested up to: 7.1
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -173,6 +173,9 @@ This plugin communicates with one host per environment:
 * **Map data** — The pickup list is loaded per city; the map's country-wide list is fetched only when the customer opens the map and is cached for an hour.
 
 == Changelog ==
+
+= 1.0.3 =
+* Security: the delivery choice posted with the cart or checkout is only read when WooCommerce's own nonce for that request verifies; any other request leaves the customer's saved choice untouched. The checkout validation and order-meta hooks check the checkout nonce themselves as well.
 
 = 1.0.2 =
 * Fixed: activating the plugin no longer contacts Sameday. Activation used to fetch cities, lockers and services straight away, which could hold the admin for over two minutes if Sameday was unreachable; the first sync is now scheduled a minute after activation and runs in the background instead.
