@@ -1,11 +1,17 @@
 jQuery(document).ready(function($) {
     // The nonce and ajaxurl are passed via wp_localize_script as 'drushfs_admin_params'
 
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     function showNotice(message, type) {
         // Remove any existing notices of ours
         $('.sameday-admin-notice').remove();
         var cssClass = (type === 'error') ? 'notice-error' : 'notice-success';
-        var notice = $('<div class="notice ' + cssClass + ' is-dismissible sameday-admin-notice"><p>' + message + '</p>' +
+        var notice = $('<div class="notice ' + cssClass + ' is-dismissible sameday-admin-notice"><p>' + escapeHtml(message) + '</p>' +
             '<button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss</span></button></div>');
         $('.wrap h1').first().after(notice);
         notice.find('.notice-dismiss').on('click', function() {

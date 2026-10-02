@@ -387,6 +387,9 @@ function drushfs_vary_package_hash( $packages ) {
 	// instead of silently falling back to address delivery.
 	$remembered    = WC()->session ? (string) WC()->session->get( 'drushfs_delivery_type', 'address' ) : 'address';
 	$delivery_type = sanitize_text_field( $merged['sameday_delivery_type'] ?? ( $remembered ?: 'address' ) );
+	if ( ! in_array( $delivery_type, array( 'address', 'easybox', 'pudo' ), true ) ) {
+		$delivery_type = 'address';
+	}
 	$office_id     = absint( $merged['sameday_office_id'] ?? 0 );
 	$selected      = WC()->session ? WC()->session->get( 'drushfs_selected_service', 0 ) : 0;
 
@@ -998,7 +1001,7 @@ function drushfs_search_offices(): void {
 	// Pickup locations come from the local table the daily sync fills, so the
 	// picker never waits on Sameday.
 	if ( class_exists( 'Drushfs_Shipping_Method' ) ) {
-		$only_easybox = isset( $_GET['only_easybox'] ) && '1' === $_GET['only_easybox'];
+		$only_easybox = isset( $_GET['only_easybox'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['only_easybox'] ) );
 		$points       = Drushfs_Shipping_Method::get_points( $term, $only_easybox );
 
 		$results = [];
@@ -1509,7 +1512,7 @@ function drushfs_validate_checkout(): void {
 	$delivery_type = isset( $_POST['sameday_delivery_type'] ) ? sanitize_text_field( wp_unslash( $_POST['sameday_delivery_type'] ) ) : 'address';
 
 	if ( 'easybox' === $delivery_type || 'pudo' === $delivery_type ) {
-		$office_id = isset( $_POST['sameday_office_id'] ) ? sanitize_text_field( wp_unslash( $_POST['sameday_office_id'] ) ) : '';
+		$office_id = isset( $_POST['sameday_office_id'] ) ? absint( $_POST['sameday_office_id'] ) : 0;
 
 		if ( empty( $office_id ) ) {
 			$error_msg = ( 'pudo' === $delivery_type )
@@ -1612,13 +1615,15 @@ function drushfs_save_order_meta( $order_id ): void {
 		return;
 	}
 	$changed = false;
-	if ( ! empty( $_POST['sameday_delivery_type'] ) ) {
-		$order->update_meta_data( '_drushfs_delivery_type', sanitize_text_field( wp_unslash( $_POST['sameday_delivery_type'] ) ) );
+	$delivery_type = isset( $_POST['sameday_delivery_type'] ) ? sanitize_key( wp_unslash( $_POST['sameday_delivery_type'] ) ) : '';
+	if ( in_array( $delivery_type, array( 'address', 'easybox', 'pudo' ), true ) ) {
+		$order->update_meta_data( '_drushfs_delivery_type', $delivery_type );
 		$changed = true;
 	}
 
-	if ( ! empty( $_POST['sameday_office_id'] ) ) {
-		$order->update_meta_data( '_drushfs_office_id', sanitize_text_field( wp_unslash( $_POST['sameday_office_id'] ) ) );
+	$office_id = isset( $_POST['sameday_office_id'] ) ? absint( $_POST['sameday_office_id'] ) : 0;
+	if ( $office_id ) {
+		$order->update_meta_data( '_drushfs_office_id', (string) $office_id );
 		$changed = true;
 	}
 	if ( $changed ) {

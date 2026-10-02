@@ -710,7 +710,8 @@
                     }
                 }
                 
-                options += '<option value="' + city.id + '" data-postcode="' + (city.postcode || '') + '" ' + selected + '>' + city.name + ' ' + (city.postcode ? '(' + city.postcode + ')' : '') + '</option>';
+                const esc = SamedayModern.esc;
+                options += '<option value="' + esc(city.id) + '" data-postcode="' + esc(city.postcode || '') + '" ' + selected + '>' + esc(city.name) + ' ' + (city.postcode ? '(' + esc(city.postcode) + ')' : '') + '</option>';
             });
 
             const selectHtml = '<select name="' + currentContext + '_city" id="' + currentContext + '_city" class="select2-hidden-accessible drushfs-city" data-placeholder="' + params.i18n.select_city + '">' + options + '</select>';
@@ -874,7 +875,7 @@
             let options = '<option value="" selected></option>';
 
             $.each(points, function(index, point) {
-                options += '<option value="' + point.id + '">' + point.label + '</option>';
+                options += '<option value="' + SamedayModern.esc(point.id) + '">' + SamedayModern.esc(point.label) + '</option>';
             });
 
             const selectHtml = '<p class="form-row form-row-wide" id="sameday-office-field">' +

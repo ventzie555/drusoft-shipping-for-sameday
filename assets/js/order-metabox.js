@@ -2,10 +2,16 @@ jQuery(document).ready(function($) {
 
     var params = drushfs_metabox_params;
 
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     function showMetaboxNotice(message, type) {
         var $notice = $('#sameday-metabox-notice');
         var color = (type === 'error') ? '#a00' : '#00a32a';
-        $notice.html('<p style="color: ' + color + ';">' + message + '</p>');
+        $notice.html('<p style="color: ' + color + ';">' + escapeHtml(message) + '</p>');
         setTimeout(function() { $notice.fadeOut(400, function() { $(this).html('').show(); }); }, 5000);
     }
 

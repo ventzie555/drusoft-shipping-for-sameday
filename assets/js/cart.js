@@ -358,7 +358,8 @@
                 selected = 'selected';
                 params.current_city_id = city.id;
             }
-            options += `<option value="${city.id}" data-postcode="${city.postcode || ''}" ${selected}>${city.name} ${city.postcode ? '(' + city.postcode + ')' : ''}</option>`;
+            const esc = SamedayModern.esc;
+            options += `<option value="${esc(city.id)}" data-postcode="${esc(city.postcode || '')}" ${selected}>${esc(city.name)} ${city.postcode ? '(' + esc(city.postcode) + ')' : ''}</option>`;
         });
 
         const $wrapper = $cityField.parent();

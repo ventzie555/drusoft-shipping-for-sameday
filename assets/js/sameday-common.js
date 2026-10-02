@@ -94,13 +94,22 @@
         }
     }
 
+    /* ─── HTML escaping for courier data put into markup ──── */
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     /* ─── Expose public API ───────────────────────────────── */
 
     window.SamedayModern = {
         transliterate:    transliterate,
         modelMatcher:     modelMatcher,
         sortStateOptions: sortStateOptions,
-        initStateSelect2: initStateSelect2
+        initStateSelect2: initStateSelect2,
+        esc:              escapeHtml
     };
 
 })(jQuery);

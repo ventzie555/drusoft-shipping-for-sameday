@@ -114,7 +114,7 @@
 		// Build error HTML as a simple div (the modal uses divs, not tables)
 		var errorHtml = '<div class="sameday-auth-error" style="padding:2px 10px 12px;">';
 		$.each( pendingErrors, function( i, msg ) {
-			errorHtml += '<p style="color:#d63638;font-weight:bold;margin:4px 0;">' + msg + '</p>';
+			errorHtml += '<p style="color:#d63638;font-weight:bold;margin:4px 0;">' + $( '<span>' ).text( String( msg ) ).html() + '</p>';
 		});
 		errorHtml += '<p style="margin:4px 0;">' + ( drushfs_admin.i18n_correct_credentials || 'Please correct your credentials and save again.' ) + '</p>';
 		errorHtml += '</div>';
