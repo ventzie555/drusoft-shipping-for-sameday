@@ -3,7 +3,7 @@
  * Plugin Name: Drusoft Shipping for Sameday
  * Plugin URI:  https://github.com/ventzie555/drusoft-shipping-for-sameday
  * Description: A clean, conflict-free Sameday integration for Bulgaria — live prices, easybox and address delivery, waybills and labels.
- * Version:     1.0.3
+ * Version:     1.0.4
  * Author:      DRUSOFT LTD
  * Author URI:  https://drusoft.dev/
  * Text Domain: drusoft-shipping-for-sameday
@@ -54,7 +54,7 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
  */
 define( 'DRUSHFS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DRUSHFS_URL',  plugin_dir_url( __FILE__ ) );
-define( 'DRUSHFS_VER',  '1.0.3' );
+define( 'DRUSHFS_VER',  '1.0.4' );
 
 /**
  * Load Dependencies
@@ -501,7 +501,7 @@ function drushfs_clear_when_unselected( $post_data = '' ): void {
 		return;
 	}
 
-	// Force WooCommerce to rebuild package rates without the stale Speedy cost.
+	// Force WooCommerce to rebuild package rates without the stale Sameday cost.
 	$packages = WC()->cart ? WC()->cart->get_shipping_packages() : [];
 	foreach ( $packages as $key => $package ) {
 		WC()->session->set( 'shipping_for_package_' . $key, false );
@@ -709,6 +709,52 @@ function drushfs_output_availability_data( $method ): void {
 		esc_attr( $availability['has_easybox'] ? '1' : '0' ),
 		esc_attr( $availability['has_pudo'] ? '1' : '0' )
 	);
+}
+
+/**
+ * Nag on the WooCommerce screens while an enabled Sameday method has
+ * credentials but no pickup point: every quote is then a table price and
+ * no waybill can be created, and nothing else in the admin says so.
+ *
+ * @return void
+ */
+add_action( 'admin_notices', 'drushfs_pickup_point_notice' );
+function drushfs_pickup_point_notice(): void {
+	if ( ! current_user_can( 'manage_woocommerce' ) || ! function_exists( 'get_current_screen' ) || ! class_exists( 'WC_Shipping_Zones' ) ) {
+		return;
+	}
+	$screen = get_current_screen();
+	$id     = $screen ? (string) $screen->id : '';
+	if ( false === strpos( $id, 'woocommerce' ) && false === strpos( $id, 'shop_order' ) && false === strpos( $id, 'wc-' ) ) {
+		return;
+	}
+
+	foreach ( WC_Shipping_Zones::get_zones() as $zone ) {
+		foreach ( (array) ( $zone['shipping_methods'] ?? array() ) as $method ) {
+			if ( 'drushfs_sameday' !== $method->id || 'yes' !== $method->enabled || (int) $method->get_option( 'pickup_point', 0 ) ) {
+				continue;
+			}
+			// Without credentials the settings modal already says what to do first.
+			$creds = method_exists( $method, 'credentials' ) ? $method->credentials() : array();
+			if ( empty( $creds['sameday_username'] ) ) {
+				continue;
+			}
+			$zone_id = (int) ( $zone['id'] ?? $zone['zone_id'] ?? 0 );
+			printf(
+				'<div class="notice notice-warning"><p>%s <a href="%s">%s</a></p></div>',
+				esc_html(
+					sprintf(
+						/* translators: %s: shipping zone name. */
+						__( 'Sameday in the “%s” shipping zone has no pickup point: customers see only the fallback table prices and no waybill can be created.', 'drusoft-shipping-for-sameday' ),
+						(string) ( $zone['zone_name'] ?? '' )
+					)
+				),
+				esc_url( admin_url( 'admin.php?page=wc-settings&tab=shipping&zone_id=' . $zone_id ) ),
+				esc_html__( 'Choose a pickup point', 'drusoft-shipping-for-sameday' )
+			);
+			return;
+		}
+	}
 }
 
 /**

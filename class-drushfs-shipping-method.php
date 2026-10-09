@@ -355,6 +355,18 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 		 * @return bool
 		 */
 		public function process_admin_options(): bool {
+			$choose = __( 'Choose a pickup point. Without it Sameday cannot price or ship your parcels, and customers only ever see the fallback table prices.', 'drusoft-shipping-for-sameday' );
+
+			// Once the credentials are in and Sameday has listed several pickup
+			// points, saving without choosing one is refused. (The very first
+			// save has no list yet — it goes through and is completed below.)
+			$post_data = $this->get_post_data();
+			$posted    = absint( $post_data[ $this->get_field_key( 'pickup_point' ) ] ?? 0 );
+			if ( ! $posted && count( $this->pickup_point_ids() ) > 1 ) {
+				$this->fail_save( $choose );
+				return false;
+			}
+
 			$saved = parent::process_admin_options();
 
 			$creds = $this->credentials();
@@ -365,7 +377,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			$token = Drushfs_Api::token( $creds, true );
 
 			if ( is_wp_error( $token ) ) {
-				WC_Admin_Settings::add_error(
+				$this->fail_save(
 					sprintf(
 						/* translators: %s: error message from Sameday. */
 						__( 'Sameday rejected these credentials: %s', 'drusoft-shipping-for-sameday' ),
@@ -378,12 +390,44 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			WC_Admin_Settings::add_message( __( 'Sameday credentials accepted.', 'drusoft-shipping-for-sameday' ) );
 
 			delete_transient( 'drushfs_pickup_points_' . md5( $creds['sameday_username'] . '|' . ( $creds['sameday_env'] ?? '' ) ) );
+			delete_transient( 'drushfs_no_pickup_' . (int) $this->instance_id );
+
+			if ( ! (int) $this->get_option( 'pickup_point', 0 ) ) {
+				$ids = $this->pickup_point_ids();
+				if ( 1 === count( $ids ) ) {
+					// One pickup point on the account: there is nothing to choose.
+					$this->instance_settings['pickup_point'] = (string) $ids[0];
+					update_option( $this->get_instance_option_key(), $this->instance_settings, 'yes' );
+					WC_Admin_Settings::add_message(
+						sprintf(
+							/* translators: %s: pickup point name and address. */
+							__( 'Pickup point selected automatically, the only one on this Sameday account: %s', 'drusoft-shipping-for-sameday' ),
+							(string) ( $this->pickup_point_options()[ $ids[0] ] ?? $ids[0] )
+						)
+					);
+				} else {
+					$this->fail_save( $choose );
+				}
+			}
 
 			if ( class_exists( 'Drushfs_Syncer' ) ) {
 				Drushfs_Syncer::sync();
 			}
 
 			return $saved;
+		}
+
+		/**
+		 * Show a settings error both in the shipping-zone modal (which reads the
+		 * method's own errors over AJAX) and on a classic settings page.
+		 *
+		 * @param string $message Message.
+		 */
+		private function fail_save( string $message ): void {
+			$this->add_error( $message );
+			if ( class_exists( 'WC_Admin_Settings' ) ) {
+				WC_Admin_Settings::add_error( $message );
+			}
 		}
 
 		/* -----------------------------------------------------------------
@@ -600,7 +644,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 			$quote = null;
 
 			$payload = $this->build_payload( $type, $package, $weight, $cod, $value, $creds );
-			if ( $payload ) {
+			if ( $payload && ! self::api_down( $creds ) ) {
 				$response = Drushfs_Api::estimate( $creds, $payload );
 
 				// The demo environment quotes in Romanian lei with test tariffs
@@ -609,10 +653,10 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 				$currency = strtoupper( (string) ( is_array( $response ) ? ( $response['currency'] ?? '' ) : '' ) );
 				$foreign  = '' !== $currency && strtoupper( get_woocommerce_currency() ) !== $currency;
 
-				if ( $foreign && function_exists( 'wc_get_logger' ) ) {
-					wc_get_logger()->notice(
-						'Sameday quoted in ' . $currency . ', not ' . get_woocommerce_currency() . ' (' . $type . '); using the fallback table.',
-						array( 'source' => 'drusoft-shipping-for-sameday' )
+				if ( $foreign ) {
+					$this->log(
+						'notice',
+						'Sameday quoted in ' . $currency . ', not ' . get_woocommerce_currency() . ' (' . $type . '); using the fallback table.'
 					);
 				}
 
@@ -621,11 +665,17 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 						'amount' => round( (float) $response['amount'], 2 ),
 						'source' => 'api',
 					);
-				} elseif ( is_wp_error( $response ) && function_exists( 'wc_get_logger' ) ) {
-					wc_get_logger()->warning(
-						'Sameday estimate failed (' . $type . '), using the fallback table: ' . $response->get_error_message(),
-						array( 'source' => 'drusoft-shipping-for-sameday' )
-					);
+				} elseif ( is_wp_error( $response ) ) {
+					$this->log( 'warning', 'Sameday estimate failed (' . $type . '), using the fallback table: ' . $response->get_error_message() );
+
+					// No answer at all (timeout, refused connection): every
+					// quote would now hold the checkout for the full timeout,
+					// so Sameday is left alone for a couple of minutes.
+					if ( 'http_request_failed' === $response->get_error_code() ) {
+						self::mark_api_down( $creds );
+					}
+				} elseif ( ! $foreign ) {
+					$this->log( 'warning', 'Sameday answered without a price (' . $type . '), using the fallback table: ' . wp_json_encode( $response ) );
 				}
 			}
 
@@ -636,9 +686,92 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 				);
 			}
 
-			set_transient( $cache_key, $quote, 15 * MINUTE_IN_SECONDS );
+			// A price from Sameday is good for 15 minutes. A table price is kept
+			// for one minute only, so that Sameday is asked again soon after it
+			// recovers instead of the table quietly pricing the next quarter hour.
+			set_transient( $cache_key, $quote, 'api' === $quote['source'] ? 15 * MINUTE_IN_SECONDS : MINUTE_IN_SECONDS );
 
 			return $quote;
+		}
+
+		/**
+		 * Whether quoting is paused because Sameday stopped answering.
+		 *
+		 * @param array $creds Credentials (the environment is part of the key).
+		 * @return bool
+		 */
+		private static function api_down( array $creds ): bool {
+			return (bool) get_transient( self::api_down_key( $creds ) );
+		}
+
+		/**
+		 * Pause quoting for two minutes after a transport failure. The fallback
+		 * table prices every quote meanwhile; the first quote after the pause
+		 * asks Sameday again.
+		 *
+		 * @param array $creds Credentials.
+		 */
+		private static function mark_api_down( array $creds ): void {
+			if ( get_transient( self::api_down_key( $creds ) ) ) {
+				return;
+			}
+			set_transient( self::api_down_key( $creds ), time(), 2 * MINUTE_IN_SECONDS );
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->warning(
+					'Sameday is not answering; the fallback table prices every delivery for the next 2 minutes, then Sameday is asked again.',
+					array( 'source' => 'drusoft-shipping-for-sameday' )
+				);
+			}
+		}
+
+		/**
+		 * @param array $creds Credentials.
+		 * @return string
+		 */
+		private static function api_down_key( array $creds ): string {
+			return 'drushfs_api_down_' . sanitize_key( (string) ( $creds['sameday_env'] ?? 'live' ) );
+		}
+
+		/**
+		 * Write to the WooCommerce log under this plugin's source.
+		 *
+		 * @param string $level   notice|warning|error.
+		 * @param string $message Message.
+		 */
+		private function log( string $level, string $message ): void {
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->log( $level, $message, array( 'source' => 'drusoft-shipping-for-sameday' ) );
+			}
+		}
+
+		/**
+		 * Say once an hour that this instance cannot ask Sameday for anything
+		 * because no pickup point is chosen. Before 1.0.4 this case fell back
+		 * to the table in silence, and a shop could sell at table prices for
+		 * weeks without knowing why.
+		 */
+		private function warn_no_pickup_point(): void {
+			$key = 'drushfs_no_pickup_' . (int) $this->instance_id;
+			if ( get_transient( $key ) ) {
+				return;
+			}
+			set_transient( $key, 1, HOUR_IN_SECONDS );
+			$this->log(
+				'warning',
+				sprintf(
+					'Sameday method (instance %d) has no pickup point, so Sameday cannot be asked for a price and the fallback table is used. Choose a pickup point in the shipping zone settings.',
+					(int) $this->instance_id
+				)
+			);
+		}
+
+		/**
+		 * Ids of the pickup points Sameday lists for this account.
+		 *
+		 * @return int[]
+		 */
+		private function pickup_point_ids(): array {
+			return array_values( array_filter( array_map( 'intval', array_keys( $this->pickup_point_options() ) ) ) );
 		}
 
 		/**
@@ -649,13 +782,30 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 		 * @return float
 		 */
 		private function fallback_price( string $type, float $weight ): float {
-			$base = (float) $this->get_option( 'fallback_' . $type, 0 );
+			$base = $this->fallback_setting( 'fallback_' . $type );
 
 			if ( $weight > 3 ) {
-				$base += ceil( $weight - 3 ) * (float) $this->get_option( 'fallback_per_kg', 0 );
+				$base += ceil( $weight - 3 ) * $this->fallback_setting( 'fallback_per_kg' );
 			}
 
 			return round( $base, 2 );
+		}
+
+		/**
+		 * One figure of the fallback table. A field the shop owner has cleared
+		 * means "the default", not "free": an emptied table plus a Sameday
+		 * outage used to price every delivery at 0.00. A deliberate 0 stays 0.
+		 *
+		 * @param string $key Setting key.
+		 * @return float
+		 */
+		private function fallback_setting( string $key ): float {
+			$value = (string) $this->get_option( $key, '' );
+			if ( '' === trim( $value ) ) {
+				$fields = $this->get_instance_form_fields();
+				$value  = isset( $fields[ $key ] ) ? (string) $this->get_field_default( $fields[ $key ] ) : '0';
+			}
+			return (float) str_replace( ',', '.', $value );
 		}
 
 		/**
@@ -671,6 +821,7 @@ if ( ! class_exists( 'Drushfs_Shipping_Method' ) ) {
 		private function build_payload( string $type, array $package, float $weight, float $cod, float $value, array $creds ): array {
 			$pickup = (int) $this->get_option( 'pickup_point', 0 );
 			if ( ! $pickup ) {
+				$this->warn_no_pickup_point();
 				return array();
 			}
 

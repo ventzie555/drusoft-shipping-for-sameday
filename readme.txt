@@ -3,7 +3,7 @@ Contributors: ventzie
 Tags: woocommerce, shipping, sameday, easybox, bulgaria
 Requires at least: 6.0
 Tested up to: 7.1
-Stable tag: 1.0.3
+Stable tag: 1.0.4
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -96,8 +96,6 @@ No. Sameday's client API has no courier-request endpoint. Collection follows you
 
 1. Checkout with the three Sameday delivery options and the easybox list.
 2. Map picker for easybox lockers and SAMEDAY points.
-3. Shipping method settings in the WooCommerce shipping zone modal.
-4. Sameday Shipment box on the order edit screen.
 
 == External Services ==
 
@@ -173,6 +171,11 @@ This plugin communicates with one host per environment:
 * **Map data** — The pickup list is loaded per city; the map's country-wide list is fetched only when the customer opens the map and is cached for an hour.
 
 == Changelog ==
+
+= 1.0.4 =
+* Improved: when Sameday stops answering, the fallback table prices the checkout for two minutes and then Sameday is asked again. A table price is now remembered for one minute instead of fifteen, so live prices return as soon as Sameday does. A price request waits at most 15 seconds instead of 45.
+* Improved: a Sameday method saved without a pickup point used to price everything from the fallback table in silence. The pickup point is now selected automatically when the account has only one; otherwise the settings refuse to save without one, a notice appears on the WooCommerce screens and the log says why.
+* Fixed: a Sameday reply without a price is logged instead of silently falling back.
 
 = 1.0.3 =
 * Security: the delivery choice posted with the cart or checkout is only read when WooCommerce's own nonce for that request verifies; any other request leaves the customer's saved choice untouched. The checkout validation and order-meta hooks check the checkout nonce themselves as well.

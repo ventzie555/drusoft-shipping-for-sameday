@@ -673,3 +673,19 @@ msgstr ""
 #: includes/class-drushfs-waybill-generator.php:224
 msgid "This order is set for locker delivery but carries no locker choice."
 msgstr "Поръчката е за доставка до автомат, но няма избран автомат."
+
+#: class-drushfs-shipping-method.php
+msgid "Choose a pickup point. Without it Sameday cannot price or ship your parcels, and customers only ever see the fallback table prices."
+msgstr "Изберете пикъп точка. Без нея Sameday не може нито да изчисли цена, нито да изпрати пратките ви, а клиентите виждат само резервните цени от таблицата."
+
+#: class-drushfs-shipping-method.php
+msgid "Pickup point selected automatically, the only one on this Sameday account: %s"
+msgstr "Пикъп точката е избрана автоматично – единствената в този акаунт в Sameday: %s"
+
+#: drusoft-shipping-for-sameday.php
+msgid "Sameday in the “%s” shipping zone has no pickup point: customers see only the fallback table prices and no waybill can be created."
+msgstr "Sameday в зоната за доставка „%s“ няма пикъп точка: клиентите виждат само резервните цени от таблицата и не може да се създаде товарителница."
+
+#: drusoft-shipping-for-sameday.php
+msgid "Choose a pickup point"
+msgstr "Изберете пикъп точка"

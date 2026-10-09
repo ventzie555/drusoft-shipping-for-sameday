@@ -124,24 +124,25 @@ class Drushfs_Api {
 	 * @param array  $creds  Credentials.
 	 * @param string $method HTTP method.
 	 * @param string $path   Path beginning with a slash.
-	 * @param array  $fields Body fields for POST, query args for GET.
-	 * @param bool   $raw    Return the raw body (used for the label PDF).
+	 * @param array  $fields  Body fields for POST, query args for GET.
+	 * @param bool   $raw     Return the raw body (used for the label PDF).
+	 * @param int    $timeout Seconds to wait for Sameday.
 	 * @return array|string|WP_Error Decoded body, raw string when $raw, or error.
 	 */
-	public static function request( array $creds, string $method, string $path, array $fields = array(), bool $raw = false ) {
+	public static function request( array $creds, string $method, string $path, array $fields = array(), bool $raw = false, int $timeout = 45 ) {
 		$token = self::token( $creds );
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
 
-		$result = self::dispatch( $creds, $token, $method, $path, $fields, $raw );
+		$result = self::dispatch( $creds, $token, $method, $path, $fields, $raw, $timeout );
 
 		if ( is_array( $result ) && isset( $result['__http'] ) && 401 === $result['__http'] ) {
 			$token = self::token( $creds, true );
 			if ( is_wp_error( $token ) ) {
 				return $token;
 			}
-			$result = self::dispatch( $creds, $token, $method, $path, $fields, $raw );
+			$result = self::dispatch( $creds, $token, $method, $path, $fields, $raw, $timeout );
 		}
 
 		if ( is_wp_error( $result ) ) {
@@ -167,16 +168,17 @@ class Drushfs_Api {
 	 * @param string $token  Auth token.
 	 * @param string $method HTTP method.
 	 * @param string $path   Path.
-	 * @param array  $fields Fields.
-	 * @param bool   $raw    Return raw body.
+	 * @param array  $fields  Fields.
+	 * @param bool   $raw     Return raw body.
+	 * @param int    $timeout Seconds to wait.
 	 * @return array|string|WP_Error
 	 */
-	private static function dispatch( array $creds, string $token, string $method, string $path, array $fields, bool $raw ) {
+	private static function dispatch( array $creds, string $token, string $method, string $path, array $fields, bool $raw, int $timeout = 45 ) {
 		$url  = self::host( $creds ) . $path;
 		$args = array(
 			'method'  => $method,
 			'headers' => array( 'X-AUTH-TOKEN' => $token ),
-			'timeout' => 45,
+			'timeout' => $timeout,
 		);
 
 		if ( 'GET' === $method ) {
@@ -405,7 +407,10 @@ class Drushfs_Api {
 	 * @return array|WP_Error {amount, currency, time}
 	 */
 	public static function estimate( array $creds, array $payload ) {
-		return self::request( $creds, 'POST', '/api/awb/estimate-cost', $payload );
+		// A quote holds up the checkout while it runs, so it waits far less
+		// than a waybill: 15 seconds, like the Speedy plugin, and then the
+		// fallback table takes over.
+		return self::request( $creds, 'POST', '/api/awb/estimate-cost', $payload, false, 15 );
 	}
 
 	/**
